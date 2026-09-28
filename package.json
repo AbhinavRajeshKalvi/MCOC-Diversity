@@ -1,0 +1,34 @@
+{
+  "name": "mcoc-diversity-planner",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "mongodb": "6.10.0",
+    "bcryptjs": "2.4.3",
+    "jose": "5.9.3",
+    "zod": "3.23.8",
+    "lucide-react": "0.453.0"
+  },
+  "devDependencies": {
+    "typescript": "5.5.4",
+    "@types/node": "20.14.15",
+    "@types/react": "18.3.5",
+    "@types/react-dom": "18.3.0",
+    "@types/bcryptjs": "2.4.6",
+    "tailwindcss": "3.4.10",
+    "postcss": "8.4.41",
+    "autoprefixer": "10.4.20"
+  }
+}

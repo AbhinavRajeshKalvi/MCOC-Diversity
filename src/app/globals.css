@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-ink text-parchment font-body antialiased;
+    background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(200, 155, 60, 0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(166, 52, 70, 0.08), transparent);
+    background-attachment: fixed;
+  }
+  ::selection {
+    @apply bg-brass/30 text-parchment;
+  }
+  :focus-visible {
+    outline: 2px solid theme("colors.brass.DEFAULT");
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-ink-panel border border-ink-line rounded-md;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-sm px-4 py-2 text-sm font-medium
+      transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-brass text-ink hover:bg-brass-bright;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent border border-ink-line text-parchment hover:border-brass-dim hover:text-brass-bright;
+  }
+  .btn-danger {
+    @apply btn bg-transparent border border-crimson/50 text-crimson-bright hover:bg-crimson/10;
+  }
+  .field-label {
+    @apply block text-xs uppercase tracking-wide text-parchment-dim mb-1;
+  }
+  .field-input {
+    @apply w-full bg-ink-raised border border-ink-line rounded-sm px-3 py-2 text-sm text-parchment
+      focus:border-brass-dim outline-none;
+  }
+  .stat {
+    @apply font-stat tabular-nums;
+  }
+}
+
+.print-only-document {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-only-document,
+  .print-only-document * {
+    visibility: visible !important;
+  }
+
+  .print-only-document {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    color: #111 !important;
+    background: #fff !important;
+    font-family: Arial, sans-serif !important;
+  }
+
+  .print-title {
+    margin: 0 0 3mm;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .print-subtitle {
+    margin: 0 0 8mm;
+    color: #555;
+    font-size: 12px;
+  }
+
+  .print-member {
+    break-inside: avoid;
+    margin-bottom: 5mm;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .print-member-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3mm 4mm;
+    background: #f2f2f2;
+    border-bottom: 1px solid #ccc;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .print-defenders {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .print-defender {
+    display: flex;
+    flex-direction: column;
+    gap: 1mm;
+    min-height: 14mm;
+    padding: 3mm;
+    border-right: 1px solid #ddd;
+    font-size: 10px;
+  }
+
+  .print-defender:last-child {
+    border-right: 0;
+  }
+
+  .print-defender span:last-child {
+    color: #555;
+    font-size: 9px;
+  }
+
+  .print-empty {
+    padding: 4mm;
+    color: #777;
+    font-size: 10px;
+  }
+
+  .print-summary {
+    margin-top: 6mm;
+    padding-top: 4mm;
+    border-top: 1px solid #ccc;
+    font-size: 11px;
+  }
+}
