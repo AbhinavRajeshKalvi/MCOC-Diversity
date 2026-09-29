@@ -621,12 +621,21 @@ function AdditionalDefendersSection({
   onPick: (champion: AssignedDefender) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(ADDITIONAL_PAGE_SIZE);
+  const query = search.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      query
+        ? defenders.filter((c) => `${c.championName} ${c.assignedTo.displayName}`.toLowerCase().includes(query))
+        : defenders,
+    [defenders, query]
+  );
   if (defenders.length === 0) return null;
 
-  const query = search.trim().toLowerCase();
-  const filtered = query
-    ? defenders.filter((c) => `${c.championName} ${c.assignedTo.displayName}`.toLowerCase().includes(query))
-    : defenders;
+  // Rendering every champion at once made long lists stutter on phones, so
+  // show them in pages. Search still covers the whole list.
+  const shown = filtered.slice(0, visibleCount);
+  const remaining = filtered.length - shown.length;
 
   return (
     <section className="panel p-5">
@@ -644,7 +653,10 @@ function AdditionalDefendersSection({
           className="field-input pl-9"
           placeholder="Search champions…"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setVisibleCount(ADDITIONAL_PAGE_SIZE);
+          }}
         />
       </div>
 
@@ -654,7 +666,7 @@ function AdditionalDefendersSection({
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {filtered.map((c) => (
+          {shown.map((c) => (
             <ChampionCard
               key={c.championId}
               name={c.championName}
@@ -669,9 +681,25 @@ function AdditionalDefendersSection({
           ))}
         </div>
       )}
+
+      {remaining > 0 && (
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <button type="button" className="btn-ghost" onClick={() => setVisibleCount((count) => count + ADDITIONAL_PAGE_SIZE)}>
+            Show {Math.min(remaining, ADDITIONAL_PAGE_SIZE)} more
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => setVisibleCount(filtered.length)}>
+            Show all ({filtered.length})
+          </button>
+        </div>
+      )}
     </section>
   );
 }
+
+const ADDITIONAL_PAGE_SIZE = 24;
+
+// Lets the browser skip layout/paint for rows that are off screen.
+const OFFSCREEN_SKIP: React.CSSProperties = { contentVisibility: "auto", containIntrinsicSize: "auto 320px" };
 
 function MemberDefenderRowView({
   member,
@@ -683,7 +711,7 @@ function MemberDefenderRowView({
   onDefenderClick: (champion: AssignedDefender) => void;
 }) {
   return (
-    <div className="rounded-md border border-ink-line bg-ink-raised/30 overflow-hidden">
+    <div className="rounded-md border border-ink-line bg-ink-raised/30 overflow-hidden" style={OFFSCREEN_SKIP}>
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-ink-line/70">
         <div className="text-sm font-medium text-parchment truncate">{member.displayName}</div>
         <div className="stat text-xs text-parchment-faint shrink-0">{member.assigned}/{member.cap}</div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import Image from "next/image";
 import { ArrowUp, Star } from "lucide-react";
 import { getChampionArt } from "@/lib/champion-art";
 import { ascensionLabel } from "@/lib/ascension";
@@ -32,6 +33,23 @@ const BADGE_STYLE: CSSProperties = {
   top: "clamp(3px, 4cqw, 6px)"
 };
 const STAT_BAR_STYLE: CSSProperties = { fontSize: "clamp(8px, 10.5cqw, 12px)" };
+
+// Hosts Next.js may resize and cache (must match images.remotePatterns in
+// next.config.mjs). Anything else, including data: URLs, uses a plain lazy image.
+const OPTIMIZED_IMAGE_HOSTS = new Set(["mcocscout.com"]);
+
+function canOptimize(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && OPTIMIZED_IMAGE_HOSTS.has(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+// Cards are ~100-130px wide on phones and at most ~200px elsewhere.
+const POSTER_SIZES = "(max-width: 640px) 34vw, 200px";
+const BANNER_SIZES = "(max-width: 640px) 100vw, 384px";
 
 export default function ChampionCard({
   name,
@@ -104,11 +122,24 @@ export default function ChampionCard({
         } ${selected ? "ring-2 ring-brass ring-offset-2 ring-offset-ink" : ""}`}
         style={{ containerType: "inline-size" }}
       >
-        {showImage ? (
+        {showImage && canOptimize(imageUrl!) ? (
+          <Image
+            src={imageUrl!}
+            alt={name}
+            fill
+            sizes={isBanner ? BANNER_SIZES : POSTER_SIZES}
+            onError={() => setImgError(true)}
+            className={`object-cover object-top transition-transform duration-300 ${onClick ? "group-hover:scale-110" : ""}`}
+          />
+        ) : showImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageUrl!}
             alt={name}
+            width={200}
+            height={isBanner ? 67 : 300}
+            loading="lazy"
+            decoding="async"
             onError={() => setImgError(true)}
             className={`absolute inset-0 w-full h-full object-cover object-top transition-transform duration-300 ${
               onClick ? "group-hover:scale-110" : ""
@@ -134,12 +165,12 @@ export default function ChampionCard({
 
         {ascended !== undefined && (
           <div
-            className={`absolute z-10 flex items-center justify-center rounded-full border backdrop-blur-sm ${
+            className={`absolute z-10 flex items-center justify-center rounded-full border ${
               ascended != null && ascended > 0
-                ? "border-violet-300/80 bg-violet-950/80 text-violet-200"
+                ? "border-violet-300/80 bg-violet-950/90 text-violet-200"
                 : ascended === 0
-                  ? "border-white/20 bg-black/50 text-white/35"
-                  : "border-white/20 bg-black/50 text-white/45"
+                  ? "border-white/20 bg-black/70 text-white/35"
+                  : "border-white/20 bg-black/70 text-white/45"
             }`}
             style={{ ...BADGE_STYLE, left: BADGE_STYLE.top }}
             title={ascensionLabel(ascended)}
@@ -151,12 +182,12 @@ export default function ChampionCard({
 
         {awakened !== undefined && (
           <div
-            className={`absolute z-10 flex items-center justify-center rounded-full border backdrop-blur-sm ${
+            className={`absolute z-10 flex items-center justify-center rounded-full border ${
               awakened === true
-                ? "border-brass-bright/80 bg-black/65 text-brass-bright"
+                ? "border-brass-bright/80 bg-black/80 text-brass-bright"
                 : awakened === false
-                  ? "border-white/20 bg-black/50 text-white/35"
-                  : "border-white/20 bg-black/50 text-white/45"
+                  ? "border-white/20 bg-black/70 text-white/35"
+                  : "border-white/20 bg-black/70 text-white/45"
             }`}
             style={{ ...BADGE_STYLE, right: BADGE_STYLE.top }}
             title={awakened === true ? "Awakened" : awakened === false ? "Not awakened" : "Awakening unknown"}
