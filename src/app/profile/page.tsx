@@ -61,8 +61,7 @@ export default async function ProfilePage() {
     <AppShell session={session}>
       <h1 className="font-display text-3xl tracking-wide text-parchment mb-1">My roster</h1>
       <p className="text-sm text-parchment-faint mb-6">
-        Import your roster from MCOC screenshots, or add champions manually with their stars, PI, and whether they are awakened or ascended. Rank and
-        signature level are optional.
+        Import your roster from MCOC screenshots, or add champions manually with their stars, PI, and whether they are awakened or ascended.
       </p>
       {dbError ? (
         <DbErrorNotice message={dbError} />

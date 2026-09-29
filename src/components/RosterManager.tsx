@@ -212,12 +212,12 @@ function EditChampionModal({
   async function save() {
     const rankValue = parseOptionalInt(rank, 1, 6);
     if (Number.isNaN(rankValue)) {
-      setError("Rank must be a whole number from 1 to 6, or left blank.");
+      setError("Rank must be a whole number from 1 to 6.");
       return;
     }
     const sigValue = parseOptionalInt(sigLevel, 0, 200);
     if (Number.isNaN(sigValue)) {
-      setError("Signature level must be a whole number from 0 to 200, or left blank.");
+      setError("Signature level must be a whole number from 0 to 200.");
       return;
     }
     setError(null);
@@ -294,7 +294,7 @@ function EditChampionModal({
               </div>
             </div>
             <div>
-              <label className="field-label">Rank <span className="normal-case text-parchment-faint">(optional)</span></label>
+              <label className="field-label">Rank</label>
               <input
                 type="number"
                 min={1}
@@ -306,7 +306,7 @@ function EditChampionModal({
               />
             </div>
             <div>
-              <label className="field-label">Signature level <span className="normal-case text-parchment-faint">(optional)</span></label>
+              <label className="field-label">Signature level</label>
               <input
                 type="number"
                 min={0}
