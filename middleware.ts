@@ -29,13 +29,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/account/password", req.url));
   }
 
-  const isAdminPath = pathname.startsWith("/admin") || pathname.startsWith("/api/users") || pathname.startsWith("/api/champions");
-  if (isAdminPath && session.role !== "officer" && req.method !== "GET") {
-    return NextResponse.json({ error: "Officers only." }, { status: 403 });
-  }
-  if (pathname.startsWith("/admin") && session.role !== "officer") {
-    return NextResponse.redirect(new URL("/profile", req.url));
-  }
+  // Role checks happen in the pages and API routes, which read the member's
+  // current role from the database; the role inside the token can be stale.
 
   return NextResponse.next();
 }

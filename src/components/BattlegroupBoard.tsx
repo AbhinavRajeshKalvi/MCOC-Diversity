@@ -701,6 +701,8 @@ function defenderOverlay(c: AssignedDefender, clickable = false, actionLabel = "
       </div>
       <div className="stat text-[9px] text-parchment-faint">
         {c.assignedTo.stars != null ? `${c.assignedTo.stars}★` : "★—"}
+        {c.assignedTo.rank != null ? ` · R${c.assignedTo.rank}` : ""}
+        {c.assignedTo.sigLevel != null ? ` · Sig ${c.assignedTo.sigLevel}` : ""}
       </div>
       {clickable && <div className="text-[9px] text-brass-bright/80 mt-0.5">{actionLabel}</div>}
     </div>
@@ -816,7 +818,7 @@ function ReassignDefenderModal({
                     <div className="flex-1 min-w-0">
                       <div className="text-sm text-parchment truncate">{owner.displayName}</div>
                       <div className="text-xs text-parchment-faint mt-0.5">
-                        {owner.rating != null ? `${owner.rating.toLocaleString()} PI` : "PI —"} · {owner.stars ?? "—"}★
+                        {owner.rating != null ? `${owner.rating.toLocaleString()} PI` : "PI —"} · {owner.stars ?? "—"}★ · R{owner.rank ?? "—"} · Sig {owner.sigLevel ?? "—"}
                       </div>
                     </div>
                     <div className="text-xs text-brass-bright">{sourceMember && owner.userId === sourceMember.userId ? "Current" : "Select"}</div>

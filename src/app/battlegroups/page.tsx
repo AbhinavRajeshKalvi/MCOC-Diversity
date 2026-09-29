@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { isOfficerRole } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import type { BattlegroupBoard } from "@/lib/diversity";
 import { loadBattlegroupBoard } from "@/lib/defender-plans";
@@ -64,8 +65,8 @@ export default async function BattlegroupsPage({
         loaded && (
           <BattlegroupBoards
             boards={loaded.boards}
-            isOfficer={session.role === "officer"}
-            allUsers={session.role === "officer" ? loaded.allUsers : []}
+            isOfficer={isOfficerRole(session.role)}
+            allUsers={isOfficerRole(session.role) ? loaded.allUsers : []}
             initialBattlegroup={Number(searchParams.bg) || 1}
             initialView={searchParams.view === "current" ? "current" : "suggested"}
           />

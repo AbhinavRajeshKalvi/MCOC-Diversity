@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, ObjectId, toObjectId } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { SCREENSHOT_IMPORT_ENABLED } from "@/lib/features";
 import { withErrorHandling } from "@/lib/api-handler";
 
 const championSchema = z.object({
@@ -19,6 +20,9 @@ const schema = z.object({
 export const POST = withErrorHandling("POST /api/roster/confirm", async (req: NextRequest) => {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (!SCREENSHOT_IMPORT_ENABLED) {
+    return NextResponse.json({ error: "Screenshot import is locked while it's under development." }, { status: 403 });
+  }
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -52,6 +56,8 @@ export const POST = withErrorHandling("POST /api/roster/confirm", async (req: Ne
           $setOnInsert: {
             userId,
             championId,
+            rank: null,
+            sigLevel: null,
             createdAt: new Date()
           }
         },

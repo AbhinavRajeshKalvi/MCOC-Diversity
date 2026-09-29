@@ -56,7 +56,12 @@ async function initialize(db: Db): Promise<void> {
     champions.createIndex({ name: 1 }, { unique: true, collation: CASE_INSENSITIVE }),
     roster.createIndex({ userId: 1, championId: 1 }, { unique: true }),
     defenderOverrides.createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
-    currentDefenderAssignments.createIndex({ battlegroup: 1, championId: 1 }, { unique: true })
+    currentDefenderAssignments.createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
+    // At most one Leader at a time.
+    users.createIndex(
+      { role: 1 },
+      { name: "single_leader", unique: true, partialFilterExpression: { role: "leader" } }
+    )
   ]);
 
   const existingChampions = await champions
@@ -82,7 +87,7 @@ async function initialize(db: Db): Promise<void> {
       username,
       displayName: "Alliance Officer",
       passwordHash: bcrypt.hashSync(password, 10),
-      role: "officer" as const,
+      role: "leader" as const,
       battlegroup: null as 1 | 2 | 3 | null,
       mustChangePassword: true,
       createdAt: new Date()

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { isOfficerRole } from "@/lib/auth";
 import AppShell from "@/components/AppShell";
 import AdminPanel from "@/components/AdminPanel";
 import DbErrorNotice from "@/components/DbErrorNotice";
@@ -13,7 +14,7 @@ async function loadAdminData() {
     id: u._id.toString(),
     username: u.username as string,
     displayName: u.displayName as string,
-    role: u.role as "officer" | "member",
+    role: u.role as "leader" | "officer" | "member",
     battlegroup: (u.battlegroup as 1 | 2 | 3 | null) ?? null,
     mustChangePassword: Boolean(u.mustChangePassword)
   }));
@@ -31,7 +32,7 @@ async function loadAdminData() {
 export default async function AdminPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role !== "officer") redirect("/profile");
+  if (!isOfficerRole(session.role)) redirect("/profile");
 
   let data: Awaited<ReturnType<typeof loadAdminData>> | null = null;
   let dbError: string | null = null;
@@ -51,7 +52,13 @@ export default async function AdminPage() {
       {dbError ? (
         <DbErrorNotice message={dbError} />
       ) : (
-        data && <AdminPanel initialUsers={data.users} initialChampions={data.champions} />
+        data && (
+          <AdminPanel
+            initialUsers={data.users}
+            initialChampions={data.champions}
+            viewer={{ userId: session.userId, role: session.role }}
+          />
+        )
       )}
     </AppShell>
   );

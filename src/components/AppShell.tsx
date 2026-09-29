@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 type NavSession = {
   displayName: string;
-  role: "officer" | "member";
+  role: "leader" | "officer" | "member";
 };
 
 const NAV_ITEMS = [
@@ -29,7 +29,7 @@ export default function AppShell({
     router.refresh();
   }
 
-  const items = session.role === "officer" ? [...NAV_ITEMS, { href: "/admin", label: "Admin" }] : NAV_ITEMS;
+  const items = session.role === "officer" || session.role === "leader" ? [...NAV_ITEMS, { href: "/admin", label: "Admin" }] : NAV_ITEMS;
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">

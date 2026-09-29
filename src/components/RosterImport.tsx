@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ImagePlus, Loader2, Trash2, UploadCloud, X } from "lucide-react";
+import { Check, ImagePlus, Loader2, Lock, Trash2, UploadCloud, X } from "lucide-react";
+import { SCREENSHOT_IMPORT_ENABLED } from "@/lib/features";
 
 export type ImportChampion = {
   name: string;
@@ -88,6 +89,21 @@ export default function RosterImport({ champions, onImported }: { champions: Cha
 
   function updateResult(index: number, patch: Partial<ImportChampion>) {
     setResults((current) => current?.map((item, i) => (i === index ? { ...item, ...patch } : item)) ?? null);
+  }
+
+  if (!SCREENSHOT_IMPORT_ENABLED) {
+    return (
+      <div className="panel p-5 opacity-60 cursor-not-allowed select-none" aria-disabled="true">
+        <div className="flex items-center gap-2 mb-1">
+          <ImagePlus size={18} className="text-parchment-faint" />
+          <h3 className="font-display text-xl tracking-wide text-parchment-dim">Import from screenshots</h3>
+          <Lock size={16} className="ml-auto text-parchment-faint" aria-label="Locked" />
+        </div>
+        <p className="text-sm text-parchment-faint">
+          Locked — this feature is still under development. Add champions manually below for now.
+        </p>
+      </div>
+    );
   }
 
   return (

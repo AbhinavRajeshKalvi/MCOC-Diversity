@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import RosterImport from "./RosterImport";
 import ChampionCard from "./ChampionCard";
-import ChampionPicker from "./ChampionPicker";
+import ChampionPicker, { parseOptionalInt } from "./ChampionPicker";
 import StarRating from "./StarRating";
 
 type RosterEntry = {
@@ -14,6 +14,8 @@ type RosterEntry = {
   championName: string;
   championImageUrl: string | null;
   stars: number | null;
+  rank: number | null;
+  sigLevel: number | null;
   rating: number | null;
   awakened: boolean | null;
   ascended: boolean | null;
@@ -55,7 +57,7 @@ export default function RosterManager({
     router.refresh();
   }
 
-  async function addChampion(form: { championId: string; stars: number; awakened: boolean; ascended: boolean; rating: number }) {
+  async function addChampion(form: { championId: string; stars: number; awakened: boolean; ascended: boolean; rating: number; rank: number | null; sigLevel: number | null }) {
     setError(null);
     const res = await fetch("/api/roster", {
       method: "POST",
@@ -71,7 +73,7 @@ export default function RosterManager({
     router.refresh();
   }
 
-  async function updateEntry(id: string, form: { stars: number; rating: number | null; awakened: boolean; ascended: boolean }) {
+  async function updateEntry(id: string, form: { stars: number; rating: number | null; awakened: boolean; ascended: boolean; rank: number | null; sigLevel: number | null }) {
     setError(null);
     const res = await fetch(`/api/roster/${id}`, {
       method: "PATCH",
@@ -163,7 +165,7 @@ export default function RosterManager({
                 overlay={
                   <div className="mt-1 flex items-center justify-between">
                     <span className="stat text-[10px] text-brass-bright">
-                      {entry.stars != null ? `${entry.stars}★` : "★—"}
+                      {entry.stars != null ? `${entry.stars}★` : "★—"}{entry.rank != null ? ` R${entry.rank}` : ""}
                     </span>
                     <span className="stat text-[10px] text-parchment-dim">{entry.rating?.toLocaleString() ?? "—"}</span>
                   </div>
@@ -194,19 +196,33 @@ function EditChampionModal({
 }: {
   entry: RosterEntry;
   onClose: () => void;
-  onSave: (id: string, form: { stars: number; rating: number | null; awakened: boolean; ascended: boolean }) => Promise<void>;
+  onSave: (id: string, form: { stars: number; rating: number | null; awakened: boolean; ascended: boolean; rank: number | null; sigLevel: number | null }) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
 }) {
   const [stars, setStars] = useState(entry.stars ?? 1);
   const [rating, setRating] = useState(entry.rating);
   const [awakened, setAwakened] = useState(entry.awakened ?? false);
   const [ascended, setAscended] = useState(entry.ascended ?? false);
+  const [rank, setRank] = useState(entry.rank != null ? String(entry.rank) : "");
+  const [sigLevel, setSigLevel] = useState(entry.sigLevel != null ? String(entry.sigLevel) : "");
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
 
   async function save() {
+    const rankValue = parseOptionalInt(rank, 1, 6);
+    if (Number.isNaN(rankValue)) {
+      setError("Rank must be a whole number from 1 to 6, or left blank.");
+      return;
+    }
+    const sigValue = parseOptionalInt(sigLevel, 0, 200);
+    if (Number.isNaN(sigValue)) {
+      setError("Signature level must be a whole number from 0 to 200, or left blank.");
+      return;
+    }
+    setError(null);
     setSaving(true);
-    await onSave(entry.id, { stars, rating, awakened, ascended });
+    await onSave(entry.id, { stars, rating, awakened, ascended, rank: rankValue, sigLevel: sigValue });
     setSaving(false);
     onClose();
   }
@@ -277,7 +293,33 @@ function EditChampionModal({
                 </select>
               </div>
             </div>
+            <div>
+              <label className="field-label">Rank <span className="normal-case text-parchment-faint">(optional)</span></label>
+              <input
+                type="number"
+                min={1}
+                max={6}
+                placeholder="1–6"
+                className="field-input stat"
+                value={rank}
+                onChange={(e) => setRank(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label">Signature level <span className="normal-case text-parchment-faint">(optional)</span></label>
+              <input
+                type="number"
+                min={0}
+                max={200}
+                placeholder="0–200"
+                className="field-input stat"
+                value={sigLevel}
+                onChange={(e) => setSigLevel(e.target.value)}
+              />
+            </div>
           </div>
+
+          {error && <p className="text-sm text-crimson-bright">{error}</p>}
 
           <button onClick={save} disabled={saving} className="btn-primary w-full">
             <Pencil size={14} />

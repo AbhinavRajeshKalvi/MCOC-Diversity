@@ -8,7 +8,14 @@ const schema = z.object({
   stars: z.number().int().min(1).max(7),
   rating: z.number().int().min(1).nullable(),
   awakened: z.boolean(),
-  ascended: z.boolean()
+  ascended: z.boolean(),
+  rank: z.number().int().min(1, "Rank must be from 1 to 6.").max(6, "Rank must be from 1 to 6.").nullable(),
+  sigLevel: z
+    .number()
+    .int()
+    .min(0, "Signature level must be from 0 to 200.")
+    .max(200, "Signature level must be from 0 to 200.")
+    .nullable()
 });
 
 export const PATCH = withErrorHandling(

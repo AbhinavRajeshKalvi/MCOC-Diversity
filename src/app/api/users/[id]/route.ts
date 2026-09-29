@@ -9,7 +9,7 @@ type DefenderOverrideDoc = { userId?: ObjectId | null; blockedUserIds?: string[]
 
 const schema = z.object({
   displayName: z.string().trim().min(1).max(60).optional(),
-  role: z.enum(["officer", "member"]).optional(),
+  role: z.enum(["leader", "officer", "member"]).optional(),
   battlegroup: z.union([z.literal(1), z.literal(2), z.literal(3), z.null()]).optional(),
   resetPassword: z.boolean().optional()
 });
@@ -19,6 +19,7 @@ export const PATCH = withErrorHandling(
   async (req: NextRequest, { params }: { params: { id: string } }) => {
     const officer = await requireOfficer().catch(() => null);
     if (!officer) return NextResponse.json({ error: "Officers only." }, { status: 403 });
+    const actorIsLeader = officer.role === "leader";
 
     const userId = toObjectId(params.id);
     if (!userId) return NextResponse.json({ error: "Member not found." }, { status: 404 });
@@ -32,30 +33,56 @@ export const PATCH = withErrorHandling(
     const db = await getDb();
     const users = db.collection("users");
 
-    if (role === "member" && params.id === officer.userId) {
-      const officerCount = await users.countDocuments({ role: "officer" });
-      if (officerCount <= 1) {
+    const target = await users.findOne({ _id: userId }, { projection: { role: 1, battlegroup: 1 } });
+    if (!target) return NextResponse.json({ error: "Member not found." }, { status: 404 });
+    const targetRole = target.role as "leader" | "officer" | "member";
+    const isSelf = params.id === officer.userId;
+
+    let transferLeadershipFrom: ObjectId | null = null;
+    if (role !== undefined && role !== targetRole) {
+      if (targetRole === "leader") {
         return NextResponse.json(
-          { error: "You're the only officer — promote someone else first." },
-          { status: 400 }
+          { error: "The Leader can't be demoted. Hand leadership to another member first." },
+          { status: 403 }
         );
       }
-    }
-
-    if (battlegroup !== undefined && battlegroup !== null) {
-      const currentUser = await users.findOne({ _id: userId }, { projection: { battlegroup: 1 } });
-      if (!currentUser) {
-        return NextResponse.json({ error: "Member not found." }, { status: 404 });
+      if (role === "leader") {
+        // Leadership is handed over by the current Leader, who becomes an
+        // officer. If nobody is Leader yet, any officer may appoint one.
+        const currentLeader = await users.findOne({ role: "leader" }, { projection: { _id: 1 } });
+        if (currentLeader && !actorIsLeader) {
+          return NextResponse.json({ error: "Only the Leader can hand over leadership." }, { status: 403 });
+        }
+        if (currentLeader) transferLeadershipFrom = currentLeader._id;
       }
-
-      if (currentUser.battlegroup !== battlegroup) {
-        const memberCount = await users.countDocuments({ battlegroup });
-        if (memberCount >= 10) {
+      if (targetRole === "officer" && role === "member" && !actorIsLeader && !isSelf) {
+        return NextResponse.json({ error: "Only the Leader can remove an officer." }, { status: 403 });
+      }
+      if (isSelf && role === "member") {
+        const officerCount = await users.countDocuments({ role: { $in: ["officer", "leader"] } });
+        if (officerCount <= 1) {
           return NextResponse.json(
-            { error: `Battlegroup ${battlegroup} is full. Each battlegroup can have at most 10 members.` },
+            { error: "You're the only officer — promote someone else first." },
             { status: 400 }
           );
         }
+      }
+    }
+
+    if (resetPassword && targetRole !== "member" && !actorIsLeader) {
+      return NextResponse.json(
+        { error: "Only the Leader can reset an officer's or the Leader's password." },
+        { status: 403 }
+      );
+    }
+
+    if (battlegroup !== undefined && battlegroup !== null && target.battlegroup !== battlegroup) {
+      const memberCount = await users.countDocuments({ battlegroup });
+      if (memberCount >= 10) {
+        return NextResponse.json(
+          { error: `Battlegroup ${battlegroup} is full. Each battlegroup can have at most 10 members.` },
+          { status: 400 }
+        );
       }
     }
 
@@ -68,6 +95,10 @@ export const PATCH = withErrorHandling(
       set.mustChangePassword = true;
     }
 
+    // Step the old Leader down first so there's never more than one.
+    if (transferLeadershipFrom) {
+      await users.updateOne({ _id: transferLeadershipFrom }, { $set: { role: "officer" } });
+    }
     if (Object.keys(set).length > 0) {
       await users.updateOne({ _id: userId }, { $set: set });
     }
@@ -103,6 +134,15 @@ export const DELETE = withErrorHandling(
     if (!userId) return NextResponse.json({ error: "Member not found." }, { status: 404 });
 
     const db = await getDb();
+    const target = await db.collection("users").findOne({ _id: userId }, { projection: { role: 1 } });
+    if (!target) return NextResponse.json({ error: "Member not found." }, { status: 404 });
+    if (target.role === "leader") {
+      return NextResponse.json({ error: "The Leader can't be removed." }, { status: 403 });
+    }
+    if (target.role === "officer" && officer.role !== "leader") {
+      return NextResponse.json({ error: "Only the Leader can remove an officer." }, { status: 403 });
+    }
+
     const result = await db.collection("users").deleteOne({ _id: userId });
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });

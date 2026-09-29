@@ -1,14 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Link2, Plus, Search, Trash2 } from "lucide-react";
+import { Crown, Link2, Plus, Search, Trash2 } from "lucide-react";
 import ChampionCard from "./ChampionCard";
+
+type Role = "leader" | "officer" | "member";
+
+type Viewer = { userId: string; role: Role };
 
 type User = {
   id: string;
   username: string;
   displayName: string;
-  role: "officer" | "member";
+  role: Role;
   battlegroup: 1 | 2 | 3 | null;
   mustChangePassword: boolean;
 };
@@ -17,21 +21,44 @@ type Champion = { id: string; name: string; imageUrl: string | null };
 
 export default function AdminPanel({
   initialUsers,
-  initialChampions
+  initialChampions,
+  viewer
 }: {
   initialUsers: User[];
   initialChampions: Champion[];
+  viewer: Viewer;
 }) {
   return (
     <div className="space-y-10">
-      <MembersSection initialUsers={initialUsers} />
+      <MembersSection initialUsers={initialUsers} viewer={viewer} />
       <ChampionsSection initialChampions={initialChampions} />
     </div>
   );
 }
 
-function MembersSection({ initialUsers }: { initialUsers: User[] }) {
+function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer: Viewer }) {
   const [users, setUsers] = useState(initialUsers);
+  const viewerIsLeader = viewer.role === "leader";
+  const hasLeader = users.some((u) => u.role === "leader");
+
+  // Mirrors the server rules: one Leader, who can't be demoted or removed;
+  // only the Leader can demote/remove officers, reset their passwords, or
+  // hand over leadership (any officer may appoint one while there is none).
+  const canChangeRole = (u: User) =>
+    u.role !== "leader" && (u.role !== "officer" || viewerIsLeader || u.id === viewer.userId);
+  const canAppointLeader = viewerIsLeader || !hasLeader;
+  const canManageAccount = (u: User) => u.role === "member" || viewerIsLeader;
+
+  async function changeRole(u: User, role: Role) {
+    if (role === "leader") {
+      const message = viewerIsLeader
+        ? `Make ${u.displayName} the Leader?\n\nYou will become an officer. Only the Leader can hand leadership back.`
+        : `Make ${u.displayName} the Leader?\n\nOnly one member can be Leader, and only they can remove officers.`;
+      if (!window.confirm(message)) return;
+    }
+    await patchUser(u.id, { role });
+    if (role === "leader" && viewerIsLeader) window.location.reload();
+  }
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +85,9 @@ function MembersSection({ initialUsers }: { initialUsers: User[] }) {
     await refresh();
   }
 
-  async function removeUser(id: string) {
+  async function removeUser(u: User) {
+    if (!window.confirm(`Remove ${u.displayName}? Their roster will be deleted too.`)) return;
+    const id = u.id;
     setError(null);
     const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
     const data = await res.json();
@@ -96,8 +125,13 @@ function MembersSection({ initialUsers }: { initialUsers: User[] }) {
       <h2 className="font-display text-2xl tracking-wide text-parchment mb-1">Members</h2>
       <p className="text-sm text-parchment-faint mb-4">
         Assign each member to a battlegroup so their roster feeds into that board's diversity
-        suggestions.
+        suggestions. The Leader has every officer permission and is the only one who can remove officers.
       </p>
+      {!hasLeader && (
+        <p className="text-sm text-brass bg-brass/10 border border-brass/30 rounded-sm px-3 py-2 mb-3">
+          No Leader is set yet. Choose &ldquo;Leader&rdquo; in a member&apos;s Role column to appoint one.
+        </p>
+      )}
       {notice && (
         <p className="text-sm text-teal-bright bg-teal/10 border border-teal/30 rounded-sm px-3 py-2 mb-3">
           {notice}
@@ -122,16 +156,30 @@ function MembersSection({ initialUsers }: { initialUsers: User[] }) {
           <tbody>
             {users.map((u) => (
               <tr key={u.id} className="border-b border-ink-line/60 last:border-0 hover:bg-ink-raised/40">
-                <td className="px-4 py-2.5 text-parchment">{u.displayName}</td>
+                <td className="px-4 py-2.5 text-parchment">
+                  <span className="inline-flex items-center gap-1.5">
+                    {u.role === "leader" && <Crown size={13} className="text-brass-bright" aria-label="Leader" />}
+                    {u.displayName}
+                  </span>
+                </td>
                 <td className="px-4 py-2.5 stat text-parchment-dim">{u.username}</td>
                 <td className="px-4 py-2.5">
                   <select
-                    className="field-input py-1 text-xs"
+                    className="field-input py-1 text-xs disabled:opacity-50"
                     value={u.role}
-                    onChange={(e) => patchUser(u.id, { role: e.target.value })}
+                    disabled={!canChangeRole(u)}
+                    title={
+                      u.role === "leader"
+                        ? "The Leader can't be demoted. They can hand leadership to someone else."
+                        : !canChangeRole(u)
+                        ? "Only the Leader can change an officer's role."
+                        : undefined
+                    }
+                    onChange={(e) => changeRole(u, e.target.value as Role)}
                   >
                     <option value="member">Member</option>
                     <option value="officer">Officer</option>
+                    {(u.role === "leader" || canAppointLeader) && <option value="leader">Leader</option>}
                   </select>
                 </td>
                 <td className="px-4 py-2.5">
@@ -158,18 +206,22 @@ function MembersSection({ initialUsers }: { initialUsers: User[] }) {
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
-                  <button
-                    onClick={() => patchUser(u.id, { resetPassword: true })}
-                    className="text-xs text-brass hover:text-brass-bright"
-                  >
-                    Reset password
-                  </button>
-                  <button
-                    onClick={() => removeUser(u.id)}
-                    className="text-xs text-crimson-bright hover:underline"
-                  >
-                    Remove
-                  </button>
+                  {canManageAccount(u) && (
+                    <button
+                      onClick={() => patchUser(u.id, { resetPassword: true })}
+                      className="text-xs text-brass hover:text-brass-bright"
+                    >
+                      Reset password
+                    </button>
+                  )}
+                  {u.role !== "leader" && u.id !== viewer.userId && canManageAccount(u) && (
+                    <button
+                      onClick={() => removeUser(u)}
+                      className="text-xs text-crimson-bright hover:underline"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

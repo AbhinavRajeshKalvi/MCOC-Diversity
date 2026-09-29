@@ -5,6 +5,8 @@ export type RosterOwner = {
   username: string;
   displayName: string;
   stars: number | null;
+  rank: number | null;
+  sigLevel: number | null;
   rating: number | null;
   awakened: boolean | null;
   ascended: boolean | null;
@@ -80,6 +82,8 @@ export type RawRosterRow = {
   championName: string;
   championImageUrl: string | null;
   stars: number | null;
+  rank: number | null;
+  sigLevel: number | null;
   rating: number | null;
   awakened: boolean | null;
   ascended: boolean | null;
@@ -98,7 +102,11 @@ function compareOwnersByRating(a: RosterOwner, b: RosterOwner): number {
 
   const aStars = a.stars ?? -1;
   const bStars = b.stars ?? -1;
-  return bStars - aStars;
+  if (aStars !== bStars) return bStars - aStars;
+  const aRank = a.rank ?? -1;
+  const bRank = b.rank ?? -1;
+  if (aRank !== bRank) return bRank - aRank;
+  return (b.sigLevel ?? -1) - (a.sigLevel ?? -1);
 }
 
 function compareCandidates(a: Candidate, b: Candidate): number {
@@ -340,6 +348,8 @@ export function computeBattlegroupBoard(
       username: row.username,
       displayName: row.displayName,
       stars: row.stars,
+      rank: row.rank,
+      sigLevel: row.sigLevel,
       rating: row.rating,
       awakened: row.awakened,
       ascended: row.ascended

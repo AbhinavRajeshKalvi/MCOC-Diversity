@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { SCREENSHOT_IMPORT_ENABLED } from "@/lib/features";
 import { withErrorHandling } from "@/lib/api-handler";
 
 export const runtime = "nodejs";
@@ -115,6 +116,9 @@ function evidenceToAscended(value: "lavender_border" | "normal_border" | "unknow
 export const POST = withErrorHandling("POST /api/roster/analyze", async (req: NextRequest) => {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (!SCREENSHOT_IMPORT_ENABLED) {
+    return NextResponse.json({ error: "Screenshot import is locked while it's under development." }, { status: 403 });
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {

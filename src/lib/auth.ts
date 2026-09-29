@@ -1,7 +1,12 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 
-export type Role = "officer" | "member";
+export type Role = "leader" | "officer" | "member";
+
+/** Leaders have every officer permission, plus leader-only ones. */
+export function isOfficerRole(role: string | null | undefined): boolean {
+  return role === "officer" || role === "leader";
+}
 
 export type SessionPayload = {
   userId: string;

@@ -12,7 +12,7 @@ export default function ChampionPicker({
   onAdd
 }: {
   champions: Champion[];
-  onAdd: (form: { championId: string; stars: number; awakened: boolean; ascended: boolean; rating: number }) => Promise<void>;
+  onAdd: (form: { championId: string; stars: number; awakened: boolean; ascended: boolean; rating: number; rank: number | null; sigLevel: number | null }) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<Champion | null>(null);
@@ -64,12 +64,14 @@ function AddChampionModal({
 }: {
   champion: Champion;
   onClose: () => void;
-  onAdd: (form: { championId: string; stars: number; awakened: boolean; ascended: boolean; rating: number }) => Promise<void>;
+  onAdd: (form: { championId: string; stars: number; awakened: boolean; ascended: boolean; rating: number; rank: number | null; sigLevel: number | null }) => Promise<void>;
 }) {
   const [stars, setStars] = useState(6);
   const [awakened, setAwakened] = useState(false);
   const [ascended, setAscended] = useState(false);
   const [rating, setRating] = useState("");
+  const [rank, setRank] = useState("");
+  const [sigLevel, setSigLevel] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,10 +81,20 @@ function AddChampionModal({
       setError("Enter the champion's PI.");
       return;
     }
+    const rankValue = parseOptionalInt(rank, 1, 6);
+    if (Number.isNaN(rankValue)) {
+      setError("Rank must be a whole number from 1 to 6, or left blank.");
+      return;
+    }
+    const sigValue = parseOptionalInt(sigLevel, 0, 200);
+    if (Number.isNaN(sigValue)) {
+      setError("Signature level must be a whole number from 0 to 200, or left blank.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
-      await onAdd({ championId: champion.id, stars, awakened, ascended, rating: pi });
+      await onAdd({ championId: champion.id, stars, awakened, ascended, rating: pi, rank: rankValue, sigLevel: sigValue });
       onClose();
     } catch {
       setError("Couldn't add that champion. Try again.");
@@ -152,6 +164,30 @@ function AddChampionModal({
                 onChange={(e) => setRating(e.target.value)}
               />
             </div>
+            <div>
+              <label className="field-label">Rank <span className="normal-case text-parchment-faint">(optional)</span></label>
+              <input
+                type="number"
+                min={1}
+                max={6}
+                placeholder="1–6"
+                className="field-input stat"
+                value={rank}
+                onChange={(e) => setRank(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label">Signature level <span className="normal-case text-parchment-faint">(optional)</span></label>
+              <input
+                type="number"
+                min={0}
+                max={200}
+                placeholder="0–200"
+                className="field-input stat"
+                value={sigLevel}
+                onChange={(e) => setSigLevel(e.target.value)}
+              />
+            </div>
           </div>
 
           {error && <p className="text-sm text-crimson-bright">{error}</p>}
@@ -163,4 +199,11 @@ function AddChampionModal({
       </div>
     </div>
   );
+}
+
+/** Parses an optional whole-number field; "" means not set, NaN means invalid. */
+export function parseOptionalInt(value: string, min: number, max: number): number | null {
+  if (value.trim() === "") return null;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= min && n <= max ? n : Number.NaN;
 }

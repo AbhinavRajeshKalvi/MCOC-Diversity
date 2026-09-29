@@ -90,6 +90,8 @@ async function loadInputs(db: Db, battlegroup: number) {
       championName: row.champion.name,
       championImageUrl: row.champion.imageUrl ?? null,
       stars: row.stars ?? null,
+      rank: row.rank ?? null,
+      sigLevel: row.sigLevel ?? null,
       rating: row.rating ?? null,
       awakened: row.awakened ?? null,
       ascended: row.ascended ?? null

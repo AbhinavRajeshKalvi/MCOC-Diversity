@@ -28,6 +28,8 @@ export const GET = withErrorHandling("GET /api/roster", async () => {
     championName: r.champion.name,
     championImageUrl: r.champion.imageUrl ?? null,
     stars: r.stars,
+    rank: r.rank ?? null,
+    sigLevel: r.sigLevel ?? null,
     rating: r.rating ?? null,
     awakened: r.awakened ?? null,
     ascended: r.ascended ?? null,
@@ -42,7 +44,15 @@ const schema = z.object({
   stars: z.number().int().min(1).max(7),
   rating: z.number({ required_error: "Enter the champion's PI." }).int().min(1),
   awakened: z.boolean(),
-  ascended: z.boolean()
+  ascended: z.boolean(),
+  rank: z.number().int().min(1, "Rank must be from 1 to 6.").max(6, "Rank must be from 1 to 6.").nullable().optional(),
+  sigLevel: z
+    .number()
+    .int()
+    .min(0, "Signature level must be from 0 to 200.")
+    .max(200, "Signature level must be from 0 to 200.")
+    .nullable()
+    .optional()
 });
 
 export const POST = withErrorHandling("POST /api/roster", async (req: NextRequest) => {
@@ -56,7 +66,7 @@ export const POST = withErrorHandling("POST /api/roster", async (req: NextReques
       { status: 400 }
     );
   }
-  const { championId, stars, rating, awakened, ascended } = parsed.data;
+  const { championId, stars, rating, awakened, ascended, rank, sigLevel } = parsed.data;
 
   const championObjId = toObjectId(championId);
   if (!championObjId) return NextResponse.json({ error: "Unknown champion." }, { status: 404 });
@@ -75,6 +85,8 @@ export const POST = withErrorHandling("POST /api/roster", async (req: NextReques
         rating,
         awakened,
         ascended,
+        rank: rank ?? null,
+        sigLevel: sigLevel ?? null,
         source: "manual",
         updatedAt: new Date()
       }
