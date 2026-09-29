@@ -1,10 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Crown, Link2, Plus, Search, Shield, Trash2 } from "lucide-react";
+import { Crown, Gem, Link2, Plus, Search, Shield, Trash2 } from "lucide-react";
 import ChampionCard from "./ChampionCard";
-
-type Role = "leader" | "officer" | "member";
+import { isLeaderOrAbove, type Role } from "@/lib/roles";
 
 type Viewer = { userId: string; role: Role };
 
@@ -38,26 +37,50 @@ export default function AdminPanel({
 
 function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer: Viewer }) {
   const [users, setUsers] = useState(initialUsers);
-  const viewerIsLeader = viewer.role === "leader";
+  const viewerIsAdmin = viewer.role === "admin";
+  const viewerIsLeaderOrAbove = isLeaderOrAbove(viewer.role);
   const hasLeader = users.some((u) => u.role === "leader");
+  const roleCounts = useMemo(() => {
+    const counts: Record<Role, number> = { admin: 0, leader: 0, officer: 0, member: 0 };
+    for (const u of users) counts[u.role] = (counts[u.role] ?? 0) + 1;
+    return counts;
+  }, [users]);
 
-  // Mirrors the server rules: one Leader, who can't be demoted or removed;
-  // only the Leader can demote/remove officers, reset their passwords, or
-  // hand over leadership (any officer may appoint one while there is none).
-  const canChangeRole = (u: User) =>
-    u.role !== "leader" && (u.role !== "officer" || viewerIsLeader || u.id === viewer.userId);
-  const canAppointLeader = viewerIsLeader || !hasLeader;
-  const canManageAccount = (u: User) => u.role === "member" || viewerIsLeader;
+  // Mirrors the server rules. One Admin (above everyone) and one Leader.
+  // Only the Admin can change the Admin or the Leader; the Leader and Admin
+  // can demote/remove officers and reset their passwords; while there's no
+  // Admin, the Leader appoints the first one.
+  const canChangeRole = (u: User) => {
+    if (u.role === "admin") return u.id === viewer.userId;
+    if (u.role === "leader") return viewerIsAdmin;
+    if (u.role === "officer") return viewerIsLeaderOrAbove || u.id === viewer.userId;
+    return true;
+  };
+  const canAppointAdmin = viewerIsAdmin;
+  const canAppointLeader = viewerIsLeaderOrAbove || !hasLeader;
+  const canResetPassword = (u: User) => u.role === "member" || (u.role !== "admin" && viewerIsLeaderOrAbove);
+  const canRemove = (u: User) =>
+    u.id !== viewer.userId &&
+    (u.role === "member" || (u.role === "officer" && viewerIsLeaderOrAbove) || (u.role === "leader" && viewerIsAdmin));
+
+  function roleTitle(u: User) {
+    if (canChangeRole(u)) return undefined;
+    if (u.role === "admin") return "Only the Admin can change their own role.";
+    if (u.role === "leader") return "Only the Admin can change the Leader's role. The Leader can hand leadership to someone else.";
+    return "Only the Leader or the Admin can change an officer's role.";
+  }
 
   async function changeRole(u: User, role: Role) {
-    if (role === "leader") {
-      const message = viewerIsLeader
-        ? `Make ${u.displayName} the Leader?\n\nYou will become an officer. Only the Leader can hand leadership back.`
-        : `Make ${u.displayName} the Leader?\n\nOnly one member can be Leader, and only they can remove officers.`;
-      if (!window.confirm(message)) return;
+    let message: string | null = null;
+    if (role === "admin") {
+      message = `Make ${u.displayName} the Admin?\n\nYou will become the Leader, and the current Leader becomes an officer. Only the Admin can pass the role on.`;
+    } else if (role === "leader") {
+      message = `Make ${u.displayName} the Leader?\n\nThere is only one Leader${hasLeader ? "; the current Leader becomes an officer" : ""}.`;
     }
+    if (message && !window.confirm(message)) return;
     await patchUser(u.id, { role });
-    if (role === "leader" && viewerIsLeader) window.location.reload();
+    // The viewer's own permissions may have changed; reload to reflect them.
+    if (role === "admin" || role === "leader" || u.id === viewer.userId) window.location.reload();
   }
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -122,10 +145,17 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
 
   return (
     <section>
-      <h2 className="font-display text-2xl tracking-wide text-parchment mb-1">Members</h2>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-1">
+        <h2 className="font-display text-2xl tracking-wide text-parchment">Members</h2>
+        <span className="stat text-lg text-brass-bright">{users.length}</span>
+        <span className="text-xs text-parchment-faint">
+          {roleCounts.admin} admin · {roleCounts.leader} leader · {roleCounts.officer} officer
+          {roleCounts.officer === 1 ? "" : "s"} · {roleCounts.member} member{roleCounts.member === 1 ? "" : "s"}
+        </span>
+      </div>
       <p className="text-sm text-parchment-faint mb-4">
         Assign each member to a battlegroup so their roster feeds into that board's diversity
-        suggestions. The Leader has every officer permission and is the only one who can remove officers.
+        suggestions. The Admin has every permission. The Leader and the Admin are the only ones who can remove officers.
       </p>
       {!hasLeader && (
         <p className="text-sm text-brass bg-brass/10 border border-brass/30 rounded-sm px-3 py-2 mb-3">
@@ -158,6 +188,7 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
               <tr key={u.id} className="border-b border-ink-line/60 last:border-0 hover:bg-ink-raised/40">
                 <td className="px-4 py-2.5 text-parchment">
                   <span className="inline-flex items-center gap-1.5">
+                    {u.role === "admin" && <Gem size={13} className="text-violet-300" aria-label="Admin" />}
                     {u.role === "leader" && <Crown size={13} className="text-brass-bright" aria-label="Leader" />}
                     {u.role === "officer" && <Shield size={13} className="text-teal-bright" aria-label="Officer" />}
                     {u.displayName}
@@ -169,18 +200,13 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
                     className="field-input py-1 text-xs disabled:opacity-50"
                     value={u.role}
                     disabled={!canChangeRole(u)}
-                    title={
-                      u.role === "leader"
-                        ? "The Leader can't be demoted. They can hand leadership to someone else."
-                        : !canChangeRole(u)
-                        ? "Only the Leader can change an officer's role."
-                        : undefined
-                    }
+                    title={roleTitle(u)}
                     onChange={(e) => changeRole(u, e.target.value as Role)}
                   >
                     <option value="member">Member</option>
                     <option value="officer">Officer</option>
                     {(u.role === "leader" || canAppointLeader) && <option value="leader">Leader</option>}
+                    {(u.role === "admin" || canAppointAdmin) && <option value="admin">Admin</option>}
                   </select>
                 </td>
                 <td className="px-4 py-2.5">
@@ -207,7 +233,7 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
-                  {canManageAccount(u) && (
+                  {canResetPassword(u) && (
                     <button
                       onClick={() => patchUser(u.id, { resetPassword: true })}
                       className="text-xs text-brass hover:text-brass-bright"
@@ -215,7 +241,7 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
                       Reset password
                     </button>
                   )}
-                  {u.role !== "leader" && u.id !== viewer.userId && canManageAccount(u) && (
+                  {canRemove(u) && (
                     <button
                       onClick={() => removeUser(u)}
                       className="text-xs text-crimson-bright hover:underline"

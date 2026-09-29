@@ -154,3 +154,9 @@
     font-size: 11px;
   }
 }
+
+/* Indeterminate progress bar shown while switching sections (AppShell). */
+@keyframes nav-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}

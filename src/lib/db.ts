@@ -61,6 +61,11 @@ async function initialize(db: Db): Promise<void> {
     users.createIndex(
       { role: 1 },
       { name: "single_leader", unique: true, partialFilterExpression: { role: "leader" } }
+    ),
+    // At most one Admin. A different key direction keeps it a separate index.
+    users.createIndex(
+      { role: -1 },
+      { name: "single_admin", unique: true, partialFilterExpression: { role: "admin" } }
     )
   ]);
 
@@ -87,7 +92,7 @@ async function initialize(db: Db): Promise<void> {
       username,
       displayName: "Alliance Officer",
       passwordHash: bcrypt.hashSync(password, 10),
-      role: "leader" as const,
+      role: "admin" as const,
       battlegroup: null as 1 | 2 | 3 | null,
       mustChangePassword: true,
       createdAt: new Date()

@@ -18,7 +18,7 @@ export const GET = withErrorHandling("GET /api/users", async () => {
     id: u._id.toString(),
     username: u.username as string,
     displayName: u.displayName as string,
-    role: u.role as "leader" | "officer" | "member",
+    role: u.role as "admin" | "leader" | "officer" | "member",
     battlegroup: (u.battlegroup as 1 | 2 | 3 | null) ?? null,
     mustChangePassword: Boolean(u.mustChangePassword)
   }));
