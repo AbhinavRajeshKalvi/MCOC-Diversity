@@ -162,12 +162,10 @@ export default function RosterManager({
                 onClick={() => setEditing(entry)}
                 awakened={entry.awakened}
                 ascended={entry.ascended}
-                overlay={
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="stat text-[10px] text-brass-bright">
-                      {entry.stars != null ? `${entry.stars}★` : "★—"}{entry.rank != null ? ` R${entry.rank}` : ""}
-                    </span>
-                    <span className="stat text-[10px] text-parchment-dim">{entry.rating?.toLocaleString() ?? "—"}</span>
+                stats={entry}
+                details={
+                  <div className="stat text-[10px] text-parchment-dim truncate">
+                    {entry.rating != null ? `${entry.rating.toLocaleString()} PI` : "PI —"}
                   </div>
                 }
               />

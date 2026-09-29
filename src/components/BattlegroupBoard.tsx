@@ -663,7 +663,8 @@ function AdditionalDefendersSection({
               onClick={isOfficer ? () => onPick(c) : undefined}
               awakened={c.assignedTo.awakened}
               ascended={c.assignedTo.ascended}
-              overlay={defenderOverlay(c, isOfficer, "Click to assign")}
+              stats={c.assignedTo}
+              details={defenderDetails(c, isOfficer, "Click to assign")}
             />
           ))}
         </div>
@@ -688,7 +689,7 @@ function MemberDefenderRowView({
         <div className="stat text-xs text-parchment-faint shrink-0">{member.assigned}/{member.cap}</div>
       </div>
 
-      <div className="grid grid-cols-5 gap-2 p-2.5">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 p-2.5">
         {member.defenders.map((champion) => (
           <ChampionCard
             key={champion.championId}
@@ -698,7 +699,8 @@ function MemberDefenderRowView({
             onClick={isOfficer ? () => onDefenderClick(champion) : undefined}
             awakened={champion.assignedTo.awakened}
             ascended={champion.assignedTo.ascended}
-            overlay={defenderOverlay(champion, isOfficer)}
+            stats={champion.assignedTo}
+            details={defenderDetails(champion, isOfficer)}
           />
         ))}
         {Array.from({ length: Math.max(0, member.cap - member.assigned) }).map((_, index) => (
@@ -715,20 +717,20 @@ function MemberDefenderRowView({
   );
 }
 
-function defenderOverlay(c: AssignedDefender, clickable = false, actionLabel = "Click to reassign") {
+function piText(rating: number | null | undefined) {
+  return rating != null ? `${rating.toLocaleString()} PI` : "PI —";
+}
+
+// Owner and PI sit under the card; stars/rank/ascension/sig are in the card's stat bar.
+function defenderDetails(c: AssignedDefender, clickable = false, actionLabel = "Click to reassign") {
   return (
-    <div className="mt-1">
-      <div className="text-brass-bright text-[10px] font-medium truncate">{c.assignedTo.displayName}</div>
-      <div className="stat text-[10px] text-parchment-dim">
-        {c.assignedTo.rating != null ? `${c.assignedTo.rating.toLocaleString()} PI` : "PI —"}
+    <>
+      <div className="text-brass-bright text-[10px] font-medium truncate" title={c.assignedTo.displayName}>
+        {c.assignedTo.displayName}
       </div>
-      <div className="stat text-[9px] text-parchment-faint">
-        {c.assignedTo.stars != null ? `${c.assignedTo.stars}★` : "★—"}
-        {c.assignedTo.rank != null ? ` · R${c.assignedTo.rank}` : ""}
-        {c.assignedTo.sigLevel != null ? ` · Sig ${c.assignedTo.sigLevel}` : ""}
-      </div>
-      {clickable && <div className="text-[9px] text-brass-bright/80 mt-0.5">{actionLabel}</div>}
-    </div>
+      <div className="stat text-[10px] text-parchment-dim truncate">{piText(c.assignedTo.rating)}</div>
+      {clickable && <div className="text-[9px] text-brass-bright/80 truncate">{actionLabel}</div>}
+    </>
   );
 }
 
@@ -880,7 +882,7 @@ function ReassignDefenderModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {targetRow?.defenders.map((defender) => (
                   <div key={defender.championId}>
                     <ChampionCard
@@ -891,13 +893,8 @@ function ReassignDefenderModal({
                       ascended={defender.assignedTo.ascended}
                       selected={replaceChampionId === defender.championId}
                       onClick={() => setReplaceChampionId(defender.championId)}
-                      overlay={
-                        <div className="mt-1">
-                          <div className="text-brass-bright text-[10px] font-medium truncate">
-                            {defender.assignedTo.rating?.toLocaleString() ?? "—"} PI
-                          </div>
-                        </div>
-                      }
+                      stats={defender.assignedTo}
+                      details={<div className="stat text-[10px] text-brass-bright truncate">{piText(defender.assignedTo.rating)}</div>}
                     />
                   </div>
                 ))}
@@ -925,7 +922,8 @@ function ReassignDefenderModal({
                     size="sm"
                     awakened={shownOwner.awakened}
                     ascended={shownOwner.ascended}
-                    overlay={<div className="text-[10px] text-brass-bright mt-1">{shownOwner.rating?.toLocaleString() ?? "—"} PI</div>}
+                    stats={shownOwner}
+                    details={<div className="stat text-[10px] text-brass-bright truncate">{piText(shownOwner.rating)}</div>}
                   />
                 </div>
                 <div className="min-w-0">
@@ -1075,24 +1073,21 @@ function MemberRosterModal({
                     onClick={inOwnPlan ? undefined : () => pick(entry)}
                     awakened={entry.owner.awakened}
                     ascended={entry.owner.ascended}
-                    overlay={
-                      <div className="mt-1">
-                        <div className="stat text-[10px] text-parchment-dim">
-                          {entry.owner.rating != null ? `${entry.owner.rating.toLocaleString()} PI` : "PI —"}
-                        </div>
-                        <div className="stat text-[9px] text-parchment-faint">
-                          {entry.owner.stars != null ? `${entry.owner.stars}★` : "★—"}
-                          {entry.owner.rank != null ? ` · R${entry.owner.rank}` : ""}
-                          {entry.owner.sigLevel != null ? ` · Sig ${entry.owner.sigLevel}` : ""}
-                        </div>
-                        <div className={`text-[9px] mt-0.5 truncate ${inOwnPlan ? "text-teal-bright" : "text-brass-bright/80"}`}>
+                    stats={entry.owner}
+                    details={
+                      <>
+                        <div className="stat text-[10px] text-parchment-dim truncate">{piText(entry.owner.rating)}</div>
+                        <div
+                          className={`text-[9px] truncate ${inOwnPlan ? "text-teal-bright" : "text-brass-bright/80"}`}
+                          title={entry.assigned && !inOwnPlan ? `With ${entry.assigned.row.displayName}` : undefined}
+                        >
                           {inOwnPlan
                             ? "In their defenders"
                             : entry.assigned
-                            ? `With ${entry.assigned.row.displayName} · click to move`
+                            ? `With ${entry.assigned.row.displayName}`
                             : "Click to assign"}
                         </div>
-                      </div>
+                      </>
                     }
                   />
                 );
