@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Crown, Link2, Plus, Search, Trash2 } from "lucide-react";
+import { Crown, Link2, Plus, Search, Shield, Trash2 } from "lucide-react";
 import ChampionCard from "./ChampionCard";
 
 type Role = "leader" | "officer" | "member";
@@ -159,6 +159,7 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
                 <td className="px-4 py-2.5 text-parchment">
                   <span className="inline-flex items-center gap-1.5">
                     {u.role === "leader" && <Crown size={13} className="text-brass-bright" aria-label="Leader" />}
+                    {u.role === "officer" && <Shield size={13} className="text-teal-bright" aria-label="Officer" />}
                     {u.displayName}
                   </span>
                 </td>

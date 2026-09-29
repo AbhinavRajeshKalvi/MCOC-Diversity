@@ -9,7 +9,7 @@ export type RosterOwner = {
   sigLevel: number | null;
   rating: number | null;
   awakened: boolean | null;
-  ascended: boolean | null;
+  ascended: number | null;
 };
 
 export type ChampionEntry = {
@@ -86,7 +86,7 @@ export type RawRosterRow = {
   sigLevel: number | null;
   rating: number | null;
   awakened: boolean | null;
-  ascended: boolean | null;
+  ascended: number | null;
 };
 
 export type DefenderOverride = {

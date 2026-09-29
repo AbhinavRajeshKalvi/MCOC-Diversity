@@ -4,13 +4,14 @@ import { getDb, ObjectId, toObjectId } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { SCREENSHOT_IMPORT_ENABLED } from "@/lib/features";
 import { withErrorHandling } from "@/lib/api-handler";
+import { normalizeAscension } from "@/lib/ascension";
 
 const championSchema = z.object({
   championId: z.string().min(1),
   stars: z.number().int().min(1).max(7).nullable(),
   rating: z.number().int().min(0).nullable(),
   awakened: z.boolean().nullable(),
-  ascended: z.boolean().nullable()
+  ascended: z.union([z.boolean(), z.number().int().min(0).max(3)]).nullable()
 });
 
 const schema = z.object({
@@ -48,7 +49,7 @@ export const POST = withErrorHandling("POST /api/roster/confirm", async (req: Ne
             stars: item.stars,
             rating: item.rating,
             awakened: item.awakened,
-            ascended: item.ascended,
+            ascended: normalizeAscension(item.ascended),
             source: "screenshot",
             importedAt: new Date(),
             updatedAt: new Date()

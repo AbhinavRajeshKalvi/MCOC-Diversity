@@ -6,6 +6,7 @@ import {
   type DefenderOverride,
   type RawRosterRow
 } from "@/lib/diversity";
+import { normalizeAscension } from "@/lib/ascension";
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 export type DefenderList = "suggested" | "current";
@@ -94,7 +95,7 @@ async function loadInputs(db: Db, battlegroup: number) {
       sigLevel: row.sigLevel ?? null,
       rating: row.rating ?? null,
       awakened: row.awakened ?? null,
-      ascended: row.ascended ?? null
+      ascended: normalizeAscension(row.ascended)
     };
   });
 

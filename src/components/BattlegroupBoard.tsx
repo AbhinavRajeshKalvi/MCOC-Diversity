@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { Check, Plus, Printer, RefreshCw, Search, Sparkles, Trash2, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { AssignedDefender, BattlegroupBoard, MemberDefenderRow } from "@/lib/diversity";
+import type { AssignedDefender, BattlegroupBoard, ChampionEntry, MemberDefenderRow, RosterOwner } from "@/lib/diversity";
+import { ascensionLabel } from "@/lib/ascension";
 import ChampionCard from "./ChampionCard";
 
 type BattlegroupMember = {
@@ -62,7 +63,10 @@ export default function BattlegroupBoards({
   const [reassigning, setReassigning] = useState<{
     sourceMember: MemberDefenderRow | null;
     champion: AssignedDefender;
+    /** Skip straight to assigning this member (used from a member's roster). */
+    targetUserId?: string;
   } | null>(null);
+  const [rosterMemberId, setRosterMemberId] = useState<string | null>(null);
 
   const router = useRouter();
   const board = boards[active];
@@ -252,6 +256,7 @@ This discards any manual changes you made to the suggested plan. The current def
               setNotice(null);
               setShowAdd(false);
               setReassigning(null);
+              setRosterMemberId(null);
               setView("suggested");
             }}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -425,7 +430,14 @@ This discards any manual changes you made to the suggested plan. The current def
                         className="flex items-center gap-2 rounded-sm bg-ink-raised/50 px-2.5 py-2"
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm text-parchment truncate">{member.displayName}</div>
+                          <button
+                            type="button"
+                            onClick={() => setRosterMemberId(member.userId)}
+                            className="block max-w-full text-left text-sm text-parchment truncate hover:text-brass-bright hover:underline"
+                            title={`View ${member.displayName}'s roster`}
+                          >
+                            {member.displayName}
+                          </button>
                           <div className="stat text-[11px] text-parchment-faint">{usage?.assigned ?? 0}/5 defenders</div>
                         </div>
                         <button
@@ -494,8 +506,19 @@ This discards any manual changes you made to the suggested plan. The current def
         />
       )}
 
+      {rosterMemberId && isOfficer && (
+        <MemberRosterModal
+          board={board}
+          member={board.suggestedDefenders.find((row) => row.userId === rosterMemberId) ?? null}
+          onClose={() => setRosterMemberId(null)}
+          onPick={(sourceMember, champion, targetUserId) => setReassigning({ sourceMember, champion, targetUserId })}
+        />
+      )}
+
       {reassigning && isOfficer && (
         <ReassignDefenderModal
+          key={`${reassigning.champion.championId}-${reassigning.targetUserId ?? ""}`}
+          initialTargetUserId={reassigning.targetUserId}
           rows={board.suggestedDefenders}
           sourceMember={reassigning.sourceMember}
           champion={reassigning.champion}
@@ -710,6 +733,7 @@ function defenderOverlay(c: AssignedDefender, clickable = false, actionLabel = "
 }
 
 function ReassignDefenderModal({
+  initialTargetUserId,
   rows,
   sourceMember,
   champion,
@@ -717,6 +741,7 @@ function ReassignDefenderModal({
   onConfirm,
   onRemove
 }: {
+  initialTargetUserId?: string;
   rows: MemberDefenderRow[];
   sourceMember: MemberDefenderRow | null;
   champion: AssignedDefender;
@@ -729,7 +754,7 @@ function ReassignDefenderModal({
   ) => Promise<void>;
   onRemove: (sourceMember: MemberDefenderRow, champion: AssignedDefender) => Promise<void>;
 }) {
-  const [targetUserId, setTargetUserId] = useState<string | null>(null);
+  const [targetUserId, setTargetUserId] = useState<string | null>(initialTargetUserId ?? null);
   const [replaceChampionId, setReplaceChampionId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -774,6 +799,9 @@ function ReassignDefenderModal({
   }
 
   const choosingReplacement = Boolean(targetRow && targetRow.assigned >= 5);
+  // Show the target member's own copy (PI, awakening, ascension) when moving.
+  const targetOwner = targetUserId ? champion.owners.find((owner) => owner.userId === targetUserId) : null;
+  const shownOwner = targetOwner ?? champion.assignedTo;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
@@ -820,6 +848,7 @@ function ReassignDefenderModal({
                       <div className="text-xs text-parchment-faint mt-0.5">
                         {owner.rating != null ? `${owner.rating.toLocaleString()} PI` : "PI —"} · {owner.stars ?? "—"}★ · R{owner.rank ?? "—"} · Sig {owner.sigLevel ?? "—"}
                       </div>
+                      <OwnerStatus owner={owner} />
                     </div>
                     <div className="text-xs text-brass-bright">{sourceMember && owner.userId === sourceMember.userId ? "Current" : "Select"}</div>
                   </button>
@@ -894,14 +923,15 @@ function ReassignDefenderModal({
                     name={champion.championName}
                     imageUrl={champion.championImageUrl}
                     size="sm"
-                    awakened={champion.assignedTo.awakened}
-                    ascended={champion.assignedTo.ascended}
-                    overlay={<div className="text-[10px] text-brass-bright mt-1">{champion.assignedTo.rating?.toLocaleString() ?? "—"} PI</div>}
+                    awakened={shownOwner.awakened}
+                    ascended={shownOwner.ascended}
+                    overlay={<div className="text-[10px] text-brass-bright mt-1">{shownOwner.rating?.toLocaleString() ?? "—"} PI</div>}
                   />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm text-parchment">Move to {targetRow?.displayName}</div>
+                  <div className="text-sm text-parchment">{sourceMember ? "Move to" : "Assign to"} {targetRow?.displayName}</div>
                   <div className="text-xs text-parchment-faint mt-1">They have {targetRow?.assigned ?? 0}/5 defender slots.</div>
+                  {targetOwner && <OwnerStatus owner={targetOwner} />}
                 </div>
               </div>
             </div>
@@ -917,6 +947,158 @@ function ReassignDefenderModal({
 
         <div className="px-5 pb-4 text-[11px] text-parchment-faint">
           This changes the Battlegroup defender assignment only. It does not change either player&apos;s actual MCOC roster.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OwnerStatus({ owner }: { owner: RosterOwner }) {
+  const awakenedLabel = owner.awakened === true ? "Awakened" : owner.awakened === false ? "Not awakened" : "Awakening unknown";
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1.5">
+      <span
+        className={`rounded-full border px-2 py-0.5 text-[10px] ${
+          owner.awakened ? "border-brass-bright/50 text-brass-bright" : "border-ink-line text-parchment-faint"
+        }`}
+      >
+        {awakenedLabel}
+      </span>
+      <span
+        className={`rounded-full border px-2 py-0.5 text-[10px] ${
+          owner.ascended ? "border-violet-300/50 text-violet-200" : "border-ink-line text-parchment-faint"
+        }`}
+      >
+        {ascensionLabel(owner.ascended)}
+      </span>
+    </div>
+  );
+}
+
+function MemberRosterModal({
+  board,
+  member,
+  onClose,
+  onPick
+}: {
+  board: BattlegroupBoard;
+  member: MemberDefenderRow | null;
+  onClose: () => void;
+  onPick: (sourceMember: MemberDefenderRow | null, champion: AssignedDefender, targetUserId: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+
+  const roster = useMemo(() => {
+    if (!member) return [];
+    // Every champion anyone in the Battlegroup owns is either in the suggested
+    // plan or in the additional list, each with its full owner list.
+    const assignment = new Map<string, { row: MemberDefenderRow; defender: AssignedDefender }>();
+    const champions = new Map<string, ChampionEntry>();
+    for (const row of board.suggestedDefenders) {
+      for (const defender of row.defenders) {
+        assignment.set(defender.championId, { row, defender });
+        champions.set(defender.championId, defender);
+      }
+    }
+    for (const champion of board.additionalPossibleDefenders) {
+      if (!champions.has(champion.championId)) champions.set(champion.championId, champion);
+    }
+
+    return Array.from(champions.values())
+      .map((champion) => {
+        const owner = champion.owners.find((entry) => entry.userId === member.userId);
+        return owner ? { champion, owner, assigned: assignment.get(champion.championId) ?? null } : null;
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+      .sort((a, b) => (b.owner.rating ?? -1) - (a.owner.rating ?? -1) || a.champion.championName.localeCompare(b.champion.championName));
+  }, [board, member]);
+
+  if (!member) return null;
+
+  const query = search.trim().toLowerCase();
+  const filtered = query ? roster.filter((entry) => entry.champion.championName.toLowerCase().includes(query)) : roster;
+
+  function pick(entry: (typeof roster)[number]) {
+    if (!member) return;
+    if (entry.assigned?.row.userId === member.userId) return;
+    if (entry.assigned) {
+      onPick(entry.assigned.row, entry.assigned.defender, member.userId);
+      return;
+    }
+    const additional = board.additionalPossibleDefenders.find((c) => c.championId === entry.champion.championId);
+    if (additional) onPick(null, additional, member.userId);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="panel w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
+        <div className="p-5 border-b border-ink-line">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-display text-xl tracking-wide text-parchment">{member.displayName}&apos;s roster</h3>
+              <p className="text-xs text-parchment-faint mt-1">
+                {roster.length} champions · {member.assigned}/{member.cap} defenders in the suggested plan. Click a champion to
+                add it to {member.displayName}&apos;s defenders.
+              </p>
+            </div>
+            <button onClick={onClose} className="text-parchment-faint hover:text-parchment" aria-label="Close">
+              <X size={20} />
+            </button>
+          </div>
+          <div className="relative mt-4">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-parchment-faint pointer-events-none" />
+            <input
+              className="field-input pl-9"
+              placeholder="Search champions…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="overflow-y-auto p-5">
+          {filtered.length === 0 ? (
+            <div className="panel p-6 text-center text-parchment-faint">
+              {roster.length === 0 ? `${member.displayName} hasn't added any champions yet.` : `No champions match “${search}”.`}
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+              {filtered.map((entry) => {
+                const inOwnPlan = entry.assigned?.row.userId === member.userId;
+                return (
+                  <ChampionCard
+                    key={entry.champion.championId}
+                    name={entry.champion.championName}
+                    imageUrl={entry.champion.championImageUrl}
+                    size="sm"
+                    selected={inOwnPlan}
+                    onClick={inOwnPlan ? undefined : () => pick(entry)}
+                    awakened={entry.owner.awakened}
+                    ascended={entry.owner.ascended}
+                    overlay={
+                      <div className="mt-1">
+                        <div className="stat text-[10px] text-parchment-dim">
+                          {entry.owner.rating != null ? `${entry.owner.rating.toLocaleString()} PI` : "PI —"}
+                        </div>
+                        <div className="stat text-[9px] text-parchment-faint">
+                          {entry.owner.stars != null ? `${entry.owner.stars}★` : "★—"}
+                          {entry.owner.rank != null ? ` · R${entry.owner.rank}` : ""}
+                          {entry.owner.sigLevel != null ? ` · Sig ${entry.owner.sigLevel}` : ""}
+                        </div>
+                        <div className={`text-[9px] mt-0.5 truncate ${inOwnPlan ? "text-teal-bright" : "text-brass-bright/80"}`}>
+                          {inOwnPlan
+                            ? "In their defenders"
+                            : entry.assigned
+                            ? `With ${entry.assigned.row.displayName} · click to move`
+                            : "Click to assign"}
+                        </div>
+                      </div>
+                    }
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

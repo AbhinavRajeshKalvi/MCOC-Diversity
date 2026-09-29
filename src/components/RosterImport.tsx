@@ -11,7 +11,7 @@ export type ImportChampion = {
   stars: number | null;
   rating: number | null;
   awakened: boolean | null;
-  ascended: boolean | null;
+  ascended: boolean | number | null;
 };
 
 type Champion = { id: string; name: string; imageUrl: string | null };
@@ -226,7 +226,7 @@ function ImportReview({
                 <td className="px-2 py-2 text-center stat">{item.stars ?? "—"}</td>
                 <td className="px-2 py-2 text-center stat">{item.rating?.toLocaleString() ?? "—"}</td>
                 <td className="px-2 py-2 text-center">{item.awakened === true ? <Check size={16} className="mx-auto text-emerald-400" /> : item.awakened === false ? "No" : "—"}</td>
-                <td className="px-2 py-2 text-center">{item.ascended === true ? <Check size={16} className="mx-auto text-emerald-400" /> : item.ascended === false ? "No" : "—"}</td>
+                <td className="px-2 py-2 text-center">{item.ascended === true ? <Check size={16} className="mx-auto text-emerald-400" /> : item.ascended === false || item.ascended === 0 ? "No" : item.ascended ?? "—"}</td>
               </tr>
             ))}
           </tbody>

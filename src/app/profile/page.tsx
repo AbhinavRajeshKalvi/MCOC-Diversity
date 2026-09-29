@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { normalizeAscension } from "@/lib/ascension";
 import { getDb, ObjectId } from "@/lib/db";
 import AppShell from "@/components/AppShell";
 import RosterManager from "@/components/RosterManager";
@@ -30,7 +31,7 @@ async function loadProfileData(userId: string) {
     sigLevel: (r.sigLevel as number | null) ?? null,
     rating: (r.rating as number | null) ?? null,
     awakened: (r.awakened as boolean | null) ?? null,
-    ascended: (r.ascended as boolean | null) ?? null,
+    ascended: normalizeAscension(r.ascended),
     source: (r.source as string | undefined) ?? "manual"
   }));
 
@@ -61,7 +62,7 @@ export default async function ProfilePage() {
     <AppShell session={session}>
       <h1 className="font-display text-3xl tracking-wide text-parchment mb-1">My roster</h1>
       <p className="text-sm text-parchment-faint mb-6">
-        Import your roster from MCOC screenshots, or add champions manually with their stars, PI, and whether they are awakened or ascended.
+        Import your roster from MCOC screenshots, or add champions manually with their stars, PI, and whether they are awakened, and their ascension level.
       </p>
       {dbError ? (
         <DbErrorNotice message={dbError} />

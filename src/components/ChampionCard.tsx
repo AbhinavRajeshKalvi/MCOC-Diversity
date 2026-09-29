@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowUp, Star } from "lucide-react";
 import { getChampionArt } from "@/lib/champion-art";
+import { ascensionLabel } from "@/lib/ascension";
 
 export default function ChampionCard({
   name,
@@ -29,7 +30,8 @@ export default function ChampionCard({
   badge?: React.ReactNode;
   /** MCOC roster state indicators: ascended is top-left, awakened is top-right. */
   awakened?: boolean | null;
-  ascended?: boolean | null;
+  /** Ascension level: 0 = not ascended, 1-3 = level, null = unknown. */
+  ascended?: number | null;
 }) {
   const [imgError, setImgError] = useState(false);
   const art = getChampionArt(name);
@@ -89,17 +91,18 @@ export default function ChampionCard({
 
       {ascended !== undefined && (
         <div
-          className={`absolute top-1.5 left-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border backdrop-blur-sm ${
-            ascended === true
-              ? "border-violet-300/80 bg-violet-950/80 text-violet-200"
-              : ascended === false
-                ? "border-white/20 bg-black/50 text-white/35"
-                : "border-white/20 bg-black/50 text-white/45"
+          className={`absolute top-1.5 left-1.5 z-10 flex h-6 min-w-6 items-center justify-center gap-px rounded-full border backdrop-blur-sm ${
+            ascended != null && ascended > 0
+              ? "border-violet-300/80 bg-violet-950/80 text-violet-200 px-1"
+              : ascended === 0
+                ? "border-white/20 bg-black/50 text-white/35 w-6"
+                : "border-white/20 bg-black/50 text-white/45 w-6"
           }`}
-          title={ascended === true ? "Ascended" : ascended === false ? "Not ascended" : "Ascension unknown"}
-          aria-label={ascended === true ? "Ascended" : ascended === false ? "Not ascended" : "Ascension unknown"}
+          title={ascensionLabel(ascended)}
+          aria-label={ascensionLabel(ascended)}
         >
           <ArrowUp size={13} strokeWidth={2.5} />
+          {ascended != null && ascended > 0 && <span className="stat text-[11px] font-semibold leading-none">{ascended}</span>}
         </div>
       )}
 

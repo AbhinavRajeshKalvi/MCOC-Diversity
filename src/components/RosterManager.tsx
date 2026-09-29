@@ -18,7 +18,7 @@ type RosterEntry = {
   sigLevel: number | null;
   rating: number | null;
   awakened: boolean | null;
-  ascended: boolean | null;
+  ascended: number | null;
   source: string;
 };
 
@@ -57,7 +57,7 @@ export default function RosterManager({
     router.refresh();
   }
 
-  async function addChampion(form: { championId: string; stars: number; awakened: boolean; ascended: boolean; rating: number; rank: number | null; sigLevel: number | null }) {
+  async function addChampion(form: { championId: string; stars: number; awakened: boolean; ascended: number; rating: number; rank: number | null; sigLevel: number | null }) {
     setError(null);
     const res = await fetch("/api/roster", {
       method: "POST",
@@ -73,7 +73,7 @@ export default function RosterManager({
     router.refresh();
   }
 
-  async function updateEntry(id: string, form: { stars: number; rating: number | null; awakened: boolean; ascended: boolean; rank: number | null; sigLevel: number | null }) {
+  async function updateEntry(id: string, form: { stars: number; rating: number | null; awakened: boolean; ascended: number; rank: number | null; sigLevel: number | null }) {
     setError(null);
     const res = await fetch(`/api/roster/${id}`, {
       method: "PATCH",
@@ -196,13 +196,13 @@ function EditChampionModal({
 }: {
   entry: RosterEntry;
   onClose: () => void;
-  onSave: (id: string, form: { stars: number; rating: number | null; awakened: boolean; ascended: boolean; rank: number | null; sigLevel: number | null }) => Promise<void>;
+  onSave: (id: string, form: { stars: number; rating: number | null; awakened: boolean; ascended: number; rank: number | null; sigLevel: number | null }) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
 }) {
   const [stars, setStars] = useState(entry.stars ?? 1);
   const [rating, setRating] = useState(entry.rating);
   const [awakened, setAwakened] = useState(entry.awakened ?? false);
-  const [ascended, setAscended] = useState(entry.ascended ?? false);
+  const [ascended, setAscended] = useState(entry.ascended ?? 0);
   const [rank, setRank] = useState(entry.rank != null ? String(entry.rank) : "");
   const [sigLevel, setSigLevel] = useState(entry.sigLevel != null ? String(entry.sigLevel) : "");
   const [error, setError] = useState<string | null>(null);
@@ -287,9 +287,11 @@ function EditChampionModal({
               </div>
               <div>
                 <label className="field-label">Ascended</label>
-                <select className="field-input" value={ascended ? "yes" : "no"} onChange={(e) => setAscended(e.target.value === "yes")}>
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
+                <select className="field-input" value={ascended} onChange={(e) => setAscended(Number(e.target.value))}>
+                  <option value="0">No</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
                 </select>
               </div>
             </div>

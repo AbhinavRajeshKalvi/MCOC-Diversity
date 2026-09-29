@@ -12,7 +12,7 @@ export default function ChampionPicker({
   onAdd
 }: {
   champions: Champion[];
-  onAdd: (form: { championId: string; stars: number; awakened: boolean; ascended: boolean; rating: number; rank: number | null; sigLevel: number | null }) => Promise<void>;
+  onAdd: (form: { championId: string; stars: number; awakened: boolean; ascended: number; rating: number; rank: number | null; sigLevel: number | null }) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<Champion | null>(null);
@@ -64,11 +64,11 @@ function AddChampionModal({
 }: {
   champion: Champion;
   onClose: () => void;
-  onAdd: (form: { championId: string; stars: number; awakened: boolean; ascended: boolean; rating: number; rank: number | null; sigLevel: number | null }) => Promise<void>;
+  onAdd: (form: { championId: string; stars: number; awakened: boolean; ascended: number; rating: number; rank: number | null; sigLevel: number | null }) => Promise<void>;
 }) {
   const [stars, setStars] = useState(6);
   const [awakened, setAwakened] = useState(false);
-  const [ascended, setAscended] = useState(false);
+  const [ascended, setAscended] = useState(0);
   const [rating, setRating] = useState("");
   const [rank, setRank] = useState("");
   const [sigLevel, setSigLevel] = useState("");
@@ -147,11 +147,13 @@ function AddChampionModal({
               <label className="field-label">Ascended</label>
               <select
                 className="field-input"
-                value={ascended ? "yes" : "no"}
-                onChange={(e) => setAscended(e.target.value === "yes")}
+                value={ascended}
+                onChange={(e) => setAscended(Number(e.target.value))}
               >
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
+                <option value="0">No</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
               </select>
             </div>
             <div className="col-span-2">

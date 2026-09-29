@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDb, ObjectId, toObjectId } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
+import { normalizeAscension } from "@/lib/ascension";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -32,7 +33,7 @@ export const GET = withErrorHandling("GET /api/roster", async () => {
     sigLevel: r.sigLevel ?? null,
     rating: r.rating ?? null,
     awakened: r.awakened ?? null,
-    ascended: r.ascended ?? null,
+    ascended: normalizeAscension(r.ascended),
     source: r.source ?? "manual"
   }));
 
@@ -44,7 +45,7 @@ const schema = z.object({
   stars: z.number().int().min(1).max(7),
   rating: z.number({ required_error: "Enter the champion's PI." }).int().min(1),
   awakened: z.boolean(),
-  ascended: z.boolean(),
+  ascended: z.number().int().min(0).max(3),
   rank: z.number().int().min(1, "Rank must be from 1 to 6.").max(6, "Rank must be from 1 to 6.").nullable().optional(),
   sigLevel: z
     .number()
