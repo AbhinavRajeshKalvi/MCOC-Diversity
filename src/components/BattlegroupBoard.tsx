@@ -1098,6 +1098,7 @@ function MemberRosterModal({
                     imageUrl={entry.champion.championImageUrl}
                     size="sm"
                     selected={inOwnPlan}
+                    taken={!!entry.assigned && !inOwnPlan}
                     onClick={inOwnPlan ? undefined : () => pick(entry)}
                     awakened={entry.owner.awakened}
                     ascended={entry.owner.ascended}

@@ -56,6 +56,7 @@ export default function ChampionCard({
   imageUrl,
   onClick,
   selected = false,
+  taken = false,
   size = "md",
   aspect = "poster",
   details,
@@ -69,6 +70,8 @@ export default function ChampionCard({
   imageUrl?: string | null;
   onClick?: () => void;
   selected?: boolean;
+  /** Red ring: the champion is already a defender for someone else. `selected` (gold) wins if both are set. */
+  taken?: boolean;
   size?: "sm" | "md";
   /** "poster" = portrait grid tile (2:3). "banner" = wide header crop (3:1). */
   aspect?: "poster" | "banner";
@@ -119,7 +122,13 @@ export default function ChampionCard({
       <div
         className={`relative w-full ${aspectClass} rounded-lg overflow-hidden transition-shadow duration-200 ${
           onClick ? "group-hover:shadow-xl group-hover:shadow-black/40" : ""
-        } ${selected ? "ring-2 ring-brass ring-offset-2 ring-offset-ink" : ""}`}
+        } ${
+          selected
+            ? "ring-2 ring-brass ring-offset-2 ring-offset-ink"
+            : taken
+            ? "ring-2 ring-red-500 ring-offset-2 ring-offset-ink"
+            : ""
+        }`}
         style={{ containerType: "inline-size" }}
       >
         {showImage && canOptimize(imageUrl!) ? (
