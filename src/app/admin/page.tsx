@@ -45,8 +45,8 @@ export default async function AdminPage() {
 
   return (
     <AppShell session={session}>
-      <h1 className="font-display text-3xl tracking-wide text-parchment mb-1">Admin</h1>
-      <p className="text-sm text-parchment-faint mb-6">
+      <h1 className="page-title">Admin</h1>
+      <p className="page-lede">
         Manage alliance members, battlegroup placement, and the champion list.
       </p>
       {dbError ? (

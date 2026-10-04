@@ -58,6 +58,8 @@ async function initialize(db: Db): Promise<void> {
   const roster = db.collection("rosterEntries");
   const defenderOverrides = db.collection("defenderOverrides");
   const currentDefenderAssignments = db.collection("currentDefenderAssignments");
+  const counters = db.collection("counters");
+  const counterProfiles = db.collection("counterProfiles");
 
   await Promise.all([
     users.createIndex({ username: 1 }, { unique: true, collation: CASE_INSENSITIVE }),
@@ -65,6 +67,9 @@ async function initialize(db: Db): Promise<void> {
     roster.createIndex({ userId: 1, championId: 1 }, { unique: true }),
     defenderOverrides.createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
     currentDefenderAssignments.createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
+    counters.createIndex({ defenderId: 1, counterId: 1 }, { unique: true }),
+    counters.createIndex({ counterId: 1 }),
+    counterProfiles.createIndex({ championId: 1 }, { unique: true }),
     // At most one Leader at a time.
     users.createIndex(
       { role: 1 },

@@ -8,45 +8,93 @@
   }
   body {
     @apply bg-ink text-parchment font-body antialiased;
-    background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(200, 155, 60, 0.08), transparent),
-      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(166, 52, 70, 0.08), transparent);
+    background-image:
+      radial-gradient(ellipse 55% 45% at 100% 0%, rgba(194, 54, 78, 0.16), transparent 70%),
+      radial-gradient(ellipse 70% 55% at 0% 0%, rgba(232, 140, 48, 0.16), transparent 70%),
+      linear-gradient(180deg, #12141b 0%, #0d0f14 55%, #0a0b0f 100%);
     background-attachment: fixed;
+  }
+  /* Faint tactical grid, fading out toward the bottom of the screen */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(246, 200, 97, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(246, 200, 97, 0.035) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: linear-gradient(180deg, #000 0%, transparent 75%);
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 75%);
   }
   ::selection {
     @apply bg-brass/30 text-parchment;
   }
   :focus-visible {
-    outline: 2px solid theme("colors.brass.DEFAULT");
+    outline: 2px solid theme("colors.brass.bright");
     outline-offset: 2px;
+  }
+  /* Slim themed scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.ink.lighter") transparent;
+  }
+  /* Section headings get a small brass-to-crimson accent bar */
+  h2.font-display {
+    @apply uppercase tracking-wider;
+  }
+  h2.font-display::before {
+    content: "";
+    @apply inline-block align-[-0.08em] mr-2 h-[0.85em] w-1 rounded-full bg-gradient-to-b from-brass-bright to-crimson;
   }
 }
 
 @layer components {
   .panel {
-    @apply bg-ink-panel border border-ink-line rounded-md;
+    @apply rounded-xl border border-ink-line/80;
+    background-color: theme("colors.ink.panel");
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 45%),
+      linear-gradient(160deg, #1d2029 0%, #161920 55%, #121419 100%);
+    box-shadow: inset 0 1px 0 0 rgba(246, 200, 97, 0.12), 0 12px 32px -12px rgba(0, 0, 0, 0.7);
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-sm px-4 py-2 text-sm font-medium
-      transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold
+      transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-brass text-ink hover:bg-brass-bright;
+    @apply btn text-ink bg-gradient-to-b from-brass-bright to-brass shadow-[0_4px_14px_-4px_rgba(246,200,97,0.55)]
+      hover:brightness-110 hover:shadow-[0_6px_20px_-4px_rgba(246,200,97,0.7)] active:translate-y-px;
   }
   .btn-ghost {
-    @apply btn bg-transparent border border-ink-line text-parchment hover:border-brass-dim hover:text-brass-bright;
+    @apply btn bg-ink-raised/60 border border-ink-line text-parchment hover:border-brass/60 hover:text-brass-bright
+      hover:bg-ink-raised;
   }
   .btn-danger {
-    @apply btn bg-transparent border border-crimson/50 text-crimson-bright hover:bg-crimson/10;
+    @apply btn bg-crimson/10 border border-crimson/50 text-crimson-bright hover:bg-crimson/20 hover:border-crimson-bright;
   }
   .field-label {
-    @apply block text-xs uppercase tracking-wide text-parchment-dim mb-1;
+    @apply block text-[11px] font-semibold uppercase tracking-wider text-parchment-dim mb-1.5;
   }
   .field-input {
-    @apply w-full bg-ink-raised border border-ink-line rounded-sm px-3 py-2 text-sm text-parchment
-      focus:border-brass-dim outline-none;
+    @apply w-full bg-ink/70 border border-ink-line rounded-md px-3 py-2 text-sm text-parchment
+      placeholder:text-parchment-faint transition-colors
+      focus:border-brass/70 focus:ring-2 focus:ring-brass/20 outline-none;
   }
   .stat {
     @apply font-stat tabular-nums;
+  }
+  /* Page header: gradient display title plus a muted lede paragraph */
+  .page-title {
+    @apply font-display text-4xl font-bold uppercase tracking-wide leading-tight mb-1
+      bg-gradient-to-r from-parchment via-brass-bright to-orange-500 bg-clip-text text-transparent;
+  }
+  .page-lede {
+    @apply text-sm text-parchment-faint mb-6 max-w-3xl;
+  }
+  .brand-mark {
+    @apply grid place-items-center rounded-lg font-display font-bold
+      bg-gradient-to-br from-brass-bright via-brass to-crimson text-ink shadow-glow;
   }
 }
 
@@ -65,10 +113,14 @@
 
   html,
   body {
-    background: #14161c !important;
+    background: #0b0e1a !important;
     background-image: none !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  body::before {
+    display: none !important;
   }
 
   body > *:not(.print-only-document) {

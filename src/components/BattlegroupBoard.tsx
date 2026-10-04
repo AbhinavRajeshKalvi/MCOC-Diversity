@@ -275,7 +275,7 @@ This discards any manual changes you made to the suggested plan. The current def
 
   return (
     <div>
-      <div className="flex gap-1 mb-5 border-b border-ink-line">
+      <div className="inline-flex flex-wrap gap-1 mb-6 p-1 rounded-xl border border-ink-line/80 bg-ink-panel/80 shadow-panel">
         {boards.map((b, i) => (
           <button
             key={b.battlegroup}
@@ -290,10 +290,10 @@ This discards any manual changes you made to the suggested plan. The current def
               setFillMemberId(null);
               setView("suggested");
             }}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-5 py-2 rounded-lg font-display text-base font-semibold uppercase tracking-wider transition-all ${
               i === active
-                ? "border-brass text-brass-bright"
-                : "border-transparent text-parchment-dim hover:text-parchment"
+                ? "bg-gradient-to-b from-brass-bright to-brass text-ink shadow-[0_4px_14px_-4px_rgba(246,200,97,0.6)]"
+                : "text-parchment-dim hover:text-parchment hover:bg-white/[0.05]"
             }`}
           >
             Battlegroup {b.battlegroup}
@@ -319,7 +319,7 @@ This discards any manual changes you made to the suggested plan. The current def
           <div className="md:col-span-3 space-y-6">
             <section className="panel p-5 print:hidden">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex gap-1 border-b border-ink-line">
+                <div className="inline-flex gap-1 p-1 rounded-lg border border-ink-line/80 bg-ink/60">
                   <button
                     type="button"
                     onClick={() => {
@@ -327,10 +327,10 @@ This discards any manual changes you made to the suggested plan. The current def
                       rememberLocation(board.battlegroup, "suggested");
                       setReassigning(null);
                     }}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all ${
                       view === "suggested"
-                        ? "border-brass text-brass-bright"
-                        : "border-transparent text-parchment-dim hover:text-parchment"
+                        ? "bg-ink-raised text-brass-bright shadow-[inset_0_0_0_1px_rgba(246,200,97,0.35)]"
+                        : "text-parchment-dim hover:text-parchment"
                     }`}
                   >
                     Suggested defender diversity
@@ -342,10 +342,10 @@ This discards any manual changes you made to the suggested plan. The current def
                       rememberLocation(board.battlegroup, "current");
                       setReassigning(null);
                     }}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all ${
                       view === "current"
-                        ? "border-brass text-brass-bright"
-                        : "border-transparent text-parchment-dim hover:text-parchment"
+                        ? "bg-ink-raised text-brass-bright shadow-[inset_0_0_0_1px_rgba(246,200,97,0.35)]"
+                        : "text-parchment-dim hover:text-parchment"
                     }`}
                   >
                     Current defender diversity

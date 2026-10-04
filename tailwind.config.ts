@@ -5,35 +5,48 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Gunmetal base with brass and ember accents: a war-room look.
         ink: {
-          DEFAULT: "#14161C",
-          panel: "#1B1E27",
-          raised: "#22262F",
-          line: "#31353F"
+          DEFAULT: "#0D0F14",
+          panel: "#161920",
+          raised: "#20232C",
+          line: "#2F333F",
+          lighter: "#474C5C"
         },
         parchment: {
-          DEFAULT: "#EDEBE4",
-          dim: "#9CA0AC",
-          faint: "#6C707B"
+          DEFAULT: "#EEF0F7",
+          dim: "#A3A9C2",
+          faint: "#6E7591"
         },
         brass: {
-          DEFAULT: "#C89B3C",
-          bright: "#E0B75B",
-          dim: "#8A6C2E"
+          DEFAULT: "#E0A93B",
+          bright: "#F6C861",
+          dim: "#9C7426"
         },
         crimson: {
-          DEFAULT: "#A63446",
-          bright: "#C24A5D"
+          DEFAULT: "#C2364E",
+          bright: "#F05A72"
         },
         teal: {
-          DEFAULT: "#4C9A7F",
-          bright: "#63B896"
-        }
+          DEFAULT: "#2FA88A",
+          bright: "#4FD1A9"
+        },
+        // Champion class colors, used as accents across the app.
+        cosmic: "#38BDF8",
+        tech: "#60A5FA",
+        mutant: "#FACC15",
+        skill: "#F87171",
+        science: "#4ADE80",
+        mystic: "#C084FC"
       },
       fontFamily: {
         display: ["var(--font-display)"],
         body: ["var(--font-body)"],
         stat: ["var(--font-stat)"]
+      },
+      boxShadow: {
+        panel: "0 1px 0 0 rgba(255,255,255,0.04) inset, 0 12px 32px -12px rgba(0,0,0,0.6)",
+        glow: "0 0 0 1px rgba(246,200,97,0.35), 0 0 22px -4px rgba(246,200,97,0.45)"
       }
     }
   },

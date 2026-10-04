@@ -9,7 +9,7 @@ export default async function PasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="font-display text-3xl tracking-wide text-parchment mb-6">
+        <h1 className="page-title mb-6">
           Change password
         </h1>
         <div className="panel p-6">

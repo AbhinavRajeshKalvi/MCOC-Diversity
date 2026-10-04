@@ -3,6 +3,7 @@ import { z } from "zod";
 import { REMOVED_CHAMPIONS, championKey, getDb, toObjectId } from "@/lib/db";
 import { requireOfficer } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
+import { COUNTERS, COUNTER_PROFILES } from "@/lib/counters";
 
 const patchSchema = z.object({
   imageUrl: z.string().trim().url().max(500).nullable()
@@ -61,6 +62,9 @@ export const DELETE = withErrorHandling(
       .updateOne({ key }, { $set: { key, name: champion.name, removedAt: new Date() } }, { upsert: true });
     // Clean up any roster entries that referenced this champion.
     await db.collection("rosterEntries").deleteMany({ championId });
+    // ...and any counter notes for or against it.
+    await db.collection(COUNTERS).deleteMany({ $or: [{ defenderId: championId }, { counterId: championId }] });
+    await db.collection(COUNTER_PROFILES).deleteOne({ championId });
 
     return NextResponse.json({ ok: true });
   }

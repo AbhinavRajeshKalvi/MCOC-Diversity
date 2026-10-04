@@ -56,7 +56,8 @@ export default function ChampionCard({
   stats,
   showName = true,
   badge,
-  eager = false
+  eager = false,
+  accent
 }: {
   name: string;
   imageUrl?: string | null;
@@ -81,6 +82,8 @@ export default function ChampionCard({
   ascended?: number | null;
   /** Load the image right away instead of lazily (needed for print copies that are never scrolled into view). */
   eager?: boolean;
+  /** Class color, drawn as a small corner flag in the top-left of the art. */
+  accent?: string | null;
 }) {
   const [imgError, setImgError] = useState(false);
   const art = getChampionArt(name);
@@ -114,14 +117,14 @@ export default function ChampionCard({
       }`}
     >
       <div
-        className={`relative w-full ${aspectClass} rounded-lg overflow-hidden transition-shadow duration-200 ${
-          onClick ? "group-hover:shadow-xl group-hover:shadow-black/40" : ""
+        className={`relative w-full ${aspectClass} rounded-lg overflow-hidden bg-ink-raised transition-shadow duration-200 ${
+          onClick && !selected && !taken ? "group-hover:shadow-[0_10px_28px_-8px_rgba(0,0,0,0.9),0_0_18px_-6px_rgba(246,200,97,0.45)]" : ""
         } ${
           selected
-            ? "ring-2 ring-brass ring-offset-2 ring-offset-ink"
+            ? "ring-2 ring-brass-bright ring-offset-2 ring-offset-ink shadow-[0_0_18px_-2px_rgba(246,200,97,0.7)]"
             : taken
-            ? "ring-2 ring-red-500 ring-offset-2 ring-offset-ink"
-            : ""
+            ? "ring-2 ring-red-500 ring-offset-2 ring-offset-ink shadow-[0_0_18px_-2px_rgba(239,68,68,0.65)]"
+            : "shadow-[0_6px_18px_-8px_rgba(0,0,0,0.8)]"
         }`}
         style={{ containerType: "inline-size" }}
       >
@@ -167,11 +170,21 @@ export default function ChampionCard({
 
         {isBanner && <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/0 to-black/0" />}
 
+        <div className="pointer-events-none absolute inset-0 rounded-lg ring-1 ring-inset ring-white/10" aria-hidden />
+
+        {accent && (
+          <div
+            className="pointer-events-none absolute left-0 top-0 z-20 w-[24%] max-w-9 aspect-square"
+            style={{ background: `linear-gradient(135deg, ${accent} 0%, ${accent} 45%, transparent 46%)`, filter: `drop-shadow(0 0 6px ${accent})` }}
+            aria-hidden
+          />
+        )}
+
         {badge && <div className="absolute top-1.5 right-1.5 z-10">{badge}</div>}
 
         {statBar && (
           <div
-            className={`absolute inset-x-0 bottom-0 z-10 bg-black/75 px-1 py-[3%] text-center stat font-semibold leading-none whitespace-nowrap overflow-hidden text-ellipsis ${
+            className={`absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/95 via-black/80 to-black/40 border-t border-white/10 px-1 py-[3%] text-center stat font-semibold leading-none whitespace-nowrap overflow-hidden text-ellipsis ${
               stats?.awakened ? "text-brass-bright" : "text-white"
             }`}
             style={STAT_BAR_STYLE}
@@ -191,7 +204,7 @@ export default function ChampionCard({
       {hasCaption && (
         <div className="mt-1 min-w-0 px-0.5 leading-tight">
           {showName && (
-            <div className={`text-parchment font-medium truncate ${size === "sm" ? "text-[11px]" : "text-xs"}`} title={name}>
+            <div className={`text-parchment font-semibold truncate ${size === "sm" ? "text-[11px]" : "text-xs"}`} title={name}>
               {name}
             </div>
           )}

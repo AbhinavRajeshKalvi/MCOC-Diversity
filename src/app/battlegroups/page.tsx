@@ -53,8 +53,8 @@ export default async function BattlegroupsPage({
 
   return (
     <AppShell session={session}>
-      <h1 className="font-display text-3xl tracking-wide text-parchment mb-1">Battlegroups</h1>
-      <p className="text-sm text-parchment-faint mb-6">
+      <h1 className="page-title">Battlegroups</h1>
+      <p className="page-lede">
         The suggested plan is built once from your alliance&apos;s best defenders and then stays as officers edit it;
         use Auto-suggest to rebuild it. The Current tab shows the defender list in use. Officers can publish the suggested
         plan to replace the current list.
