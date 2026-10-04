@@ -66,7 +66,7 @@ function AddChampionModal({
   onClose: () => void;
   onAdd: (form: { championId: string; stars: number; awakened: boolean; ascended: number; rating: number; rank: number | null; sigLevel: number | null }) => Promise<void>;
 }) {
-  const [stars, setStars] = useState(6);
+  const [stars, setStars] = useState(7);
   const [awakened, setAwakened] = useState(false);
   const [ascended, setAscended] = useState(0);
   const [rating, setRating] = useState("");

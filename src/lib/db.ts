@@ -70,6 +70,8 @@ async function initialize(db: Db): Promise<void> {
     counters.createIndex({ defenderId: 1, counterId: 1 }, { unique: true }),
     counters.createIndex({ counterId: 1 }),
     counterProfiles.createIndex({ championId: 1 }, { unique: true }),
+    // One member per attack path or upper-island node, per battlegroup.
+    db.collection("attackAssignments").createIndex({ battlegroup: 1, slot: 1 }, { unique: true }),
     // At most one Leader at a time.
     users.createIndex(
       { role: 1 },

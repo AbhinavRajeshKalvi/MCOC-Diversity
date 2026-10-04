@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { KeyRound, Loader2, LogOut, Menu, Shield, Swords, Users, UserCog, X, type LucideIcon } from "lucide-react";
+import { Crosshair, KeyRound, Loader2, LogOut, Menu, Shield, Swords, Users, UserCog, X, type LucideIcon } from "lucide-react";
 import { isOfficerRole, type Role } from "@/lib/roles";
 
 type NavSession = {
@@ -16,6 +16,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon; accent: string }
 // Each section gets a champion-class color as its accent.
 const NAV_ITEMS: NavItem[] = [
   { href: "/battlegroups", label: "Battlegroups", icon: Users, accent: "#38BDF8" },
+  { href: "/attack", label: "Attack", icon: Crosshair, accent: "#FACC15" },
   { href: "/counters", label: "Counters", icon: Swords, accent: "#F87171" },
   { href: "/profile", label: "My Roster", icon: Shield, accent: "#4ADE80" }
 ];
