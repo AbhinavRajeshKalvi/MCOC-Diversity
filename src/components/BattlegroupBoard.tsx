@@ -275,7 +275,7 @@ This discards any manual changes you made to the suggested plan. The current def
 
   return (
     <div>
-      <div className="inline-flex flex-wrap gap-1 mb-6 p-1 rounded-xl border border-ink-line/80 bg-ink-panel/80 shadow-panel">
+      <div className="flex w-full sm:inline-flex sm:w-auto flex-wrap gap-1 mb-6 p-1 rounded-xl border border-ink-line/80 bg-ink-panel/80 shadow-panel">
         {boards.map((b, i) => (
           <button
             key={b.battlegroup}
@@ -290,13 +290,14 @@ This discards any manual changes you made to the suggested plan. The current def
               setFillMemberId(null);
               setView("suggested");
             }}
-            className={`px-5 py-2 rounded-lg font-display text-base font-semibold uppercase tracking-wider transition-all ${
+            className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg font-display text-base font-semibold uppercase tracking-wider whitespace-nowrap transition-all ${
               i === active
                 ? "bg-gradient-to-b from-brass-bright to-brass text-ink shadow-[0_4px_14px_-4px_rgba(246,200,97,0.6)]"
                 : "text-parchment-dim hover:text-parchment hover:bg-white/[0.05]"
             }`}
           >
-            Battlegroup {b.battlegroup}
+            <span className="sm:hidden">BG</span>
+            <span className="hidden sm:inline">Battlegroup</span> {b.battlegroup}
           </button>
         ))}
       </div>
@@ -315,11 +316,11 @@ This discards any manual changes you made to the suggested plan. The current def
           )}
         </div>
       ) : (
-        <div className="grid md:grid-cols-4 gap-6">
-          <div className="md:col-span-3 space-y-6">
+        <div className="grid xl:grid-cols-4 gap-6">
+          <div className="xl:col-span-3 min-w-0 space-y-6">
             <section className="panel p-5 print:hidden">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="inline-flex gap-1 p-1 rounded-lg border border-ink-line/80 bg-ink/60">
+                <div className="flex w-full sm:inline-flex sm:w-auto gap-1 p-1 rounded-lg border border-ink-line/80 bg-ink/60">
                   <button
                     type="button"
                     onClick={() => {
@@ -327,13 +328,13 @@ This discards any manual changes you made to the suggested plan. The current def
                       rememberLocation(board.battlegroup, "suggested");
                       setReassigning(null);
                     }}
-                    className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all ${
                       view === "suggested"
                         ? "bg-ink-raised text-brass-bright shadow-[inset_0_0_0_1px_rgba(246,200,97,0.35)]"
                         : "text-parchment-dim hover:text-parchment"
                     }`}
                   >
-                    Suggested defender diversity
+                    Suggested<span className="hidden sm:inline"> defender diversity</span>
                   </button>
                   <button
                     type="button"
@@ -342,23 +343,23 @@ This discards any manual changes you made to the suggested plan. The current def
                       rememberLocation(board.battlegroup, "current");
                       setReassigning(null);
                     }}
-                    className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all ${
                       view === "current"
                         ? "bg-ink-raised text-brass-bright shadow-[inset_0_0_0_1px_rgba(246,200,97,0.35)]"
                         : "text-parchment-dim hover:text-parchment"
                     }`}
                   >
-                    Current defender diversity
+                    Current<span className="hidden sm:inline"> defender diversity</span>
                   </button>
                 </div>
 
                 {view === "suggested" && isOfficer && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex w-full sm:w-auto flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={runAutoSuggest}
                       disabled={autoSuggesting}
-                      className="btn-ghost"
+                      className="btn-ghost w-full sm:w-auto"
                       title="Rebuild the suggested plan from the best defenders and highest PI"
                     >
                       <Sparkles size={15} />
@@ -368,7 +369,7 @@ This discards any manual changes you made to the suggested plan. The current def
                       type="button"
                       onClick={publishSuggested}
                       disabled={publishing}
-                      className="btn-primary"
+                      className="btn-primary w-full sm:w-auto"
                       title="Replace the persisted current defender list with this suggested plan"
                     >
                       <RefreshCw size={15} />
@@ -381,7 +382,7 @@ This discards any manual changes you made to the suggested plan. The current def
                   <button
                     type="button"
                     onClick={() => window.print()}
-                    className="btn-ghost"
+                    className="btn-ghost w-full sm:w-auto"
                   >
                     <Printer size={15} />
                     Print / Save as PDF
@@ -438,10 +439,10 @@ This discards any manual changes you made to the suggested plan. The current def
             )}
           </div>
 
-          <aside className="space-y-6 print:hidden">
+          <aside className="min-w-0 grid content-start gap-6 md:grid-cols-2 xl:grid-cols-1 print:hidden">
             {isOfficer && (
-              <section className="panel p-5">
-                <div className="flex items-start justify-between gap-3 mb-3">
+              <section className="panel p-5 md:row-span-2 xl:row-span-1">
+                <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-3">
                   <div>
                     <h2 className="font-display text-xl tracking-wide text-parchment">Battlegroup members</h2>
                     <p className="text-xs text-parchment-faint mt-1">{members.length}/10 members</p>
@@ -708,7 +709,7 @@ function AdditionalDefendersSection({
           No champions match “{search}”.
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
           {shown.map((c) => (
             <ChampionCard
               key={c.championId}
@@ -942,7 +943,7 @@ function ReassignDefenderModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="panel w-full max-w-2xl max-h-[90vh] overflow-hidden" onClick={(event) => event.stopPropagation()}>
+      <div className="panel w-full max-w-2xl max-h-[90dvh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
         <div className="p-5 border-b border-ink-line">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -1168,7 +1169,7 @@ function MemberRosterModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="panel w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
+      <div className="panel w-full max-w-4xl max-h-[90dvh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
         <div className="p-5 border-b border-ink-line">
           <div className="flex items-start justify-between gap-3">
             <div>

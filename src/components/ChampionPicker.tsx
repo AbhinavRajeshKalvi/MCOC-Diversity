@@ -109,7 +109,7 @@ function AddChampionModal({
       onClick={onClose}
     >
       <div
-        className="panel w-full max-w-sm overflow-hidden"
+        className="panel w-full max-w-sm max-h-[90dvh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative">

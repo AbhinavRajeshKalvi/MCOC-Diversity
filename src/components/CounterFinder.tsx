@@ -622,7 +622,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="panel w-full max-w-md max-h-[90vh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="panel w-full max-w-md max-h-[90dvh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-4">
           <h3 className="font-display text-xl tracking-wide text-parchment">{title}</h3>
           <button onClick={onClose} className="p-1 text-parchment-faint hover:text-parchment" aria-label="Close">

@@ -174,7 +174,82 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
 
       <AddMemberForm onAdd={addUser} />
 
-      <div className="panel overflow-hidden mt-4">
+      {/* Phones and narrow screens: one card per member so every action stays in view. */}
+      <ul className="xl:hidden mt-4 grid gap-3 md:grid-cols-2">
+        {users.map((u) => (
+          <li key={u.id} className="panel p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-parchment">
+                  {u.role === "admin" && <Gem size={13} className="shrink-0 text-violet-300" aria-label="Admin" />}
+                  {u.role === "leader" && <Crown size={13} className="shrink-0 text-brass-bright" aria-label="Leader" />}
+                  {u.role === "officer" && <Shield size={13} className="shrink-0 text-teal-bright" aria-label="Officer" />}
+                  <span className="truncate">{u.displayName}</span>
+                </div>
+                <div className="stat text-xs text-parchment-dim truncate">@{u.username}</div>
+              </div>
+              <span className={`shrink-0 text-xs ${u.mustChangePassword ? "text-brass" : "text-parchment-faint"}`}>
+                {u.mustChangePassword ? "default password" : "active"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="field-label" htmlFor={`role-${u.id}`}>Role</label>
+                <select
+                  id={`role-${u.id}`}
+                  className="field-input text-sm disabled:opacity-50"
+                  value={u.role}
+                  disabled={!canChangeRole(u)}
+                  title={roleTitle(u)}
+                  onChange={(e) => changeRole(u, e.target.value as Role)}
+                >
+                  <option value="member">Member</option>
+                  <option value="officer">Officer</option>
+                  {(u.role === "leader" || canAppointLeader) && <option value="leader">Leader</option>}
+                  {(u.role === "admin" || canAppointAdmin) && <option value="admin">Admin</option>}
+                </select>
+              </div>
+              <div>
+                <label className="field-label" htmlFor={`bg-${u.id}`}>Battlegroup</label>
+                <select
+                  id={`bg-${u.id}`}
+                  className="field-input text-sm"
+                  value={u.battlegroup ?? ""}
+                  onChange={(e) =>
+                    patchUser(u.id, {
+                      battlegroup: e.target.value ? Number(e.target.value) : null
+                    })
+                  }
+                >
+                  <option value="">Unassigned</option>
+                  <option value="1">Battlegroup 1</option>
+                  <option value="2">Battlegroup 2</option>
+                  <option value="3">Battlegroup 3</option>
+                </select>
+              </div>
+            </div>
+            {(canResetPassword(u) || canRemove(u)) && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {canResetPassword(u) && (
+                  <button
+                    onClick={() => patchUser(u.id, { resetPassword: true })}
+                    className="btn-ghost flex-1 py-1.5 text-xs text-brass"
+                  >
+                    Reset password
+                  </button>
+                )}
+                {canRemove(u) && (
+                  <button onClick={() => removeUser(u)} className="btn-danger flex-1 py-1.5 text-xs">
+                    Remove
+                  </button>
+                )}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <div className="panel overflow-x-auto mt-4 hidden xl:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ink-line text-left text-xs uppercase tracking-wide text-parchment-faint">
@@ -296,7 +371,7 @@ function AddMemberForm({
 
   return (
     <form onSubmit={onSubmit} className="panel p-5">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 items-end">
         <div>
           <label className="field-label">Display name</label>
           <input
@@ -339,7 +414,7 @@ function AddMemberForm({
             <option value="3">Battlegroup 3</option>
           </select>
         </div>
-        <button type="submit" disabled={submitting} className="btn-primary">
+        <button type="submit" disabled={submitting} className="btn-primary col-span-2 lg:col-span-1">
           <Plus size={14} />
           {submitting ? "Adding…" : "Add member"}
         </button>
@@ -625,7 +700,7 @@ function ChampionsSection({ initialChampions }: { initialChampions: Champion[] }
 
       <form onSubmit={addChampion} className="flex flex-wrap gap-3 mb-4">
         <input
-          className="field-input max-w-xs"
+          className="field-input flex-1 min-w-0 sm:max-w-xs"
           placeholder="New champion name"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -635,10 +710,10 @@ function ChampionsSection({ initialChampions }: { initialChampions: Champion[] }
           <Plus size={14} />
           Add
         </button>
-        <div className="relative ml-auto">
+        <div className="relative w-full sm:w-auto sm:ml-auto">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-parchment-faint" />
           <input
-            className="field-input max-w-xs pl-8"
+            className="field-input sm:max-w-xs pl-8"
             placeholder="Filter…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -646,7 +721,7 @@ function ChampionsSection({ initialChampions }: { initialChampions: Champion[] }
         </div>
       </form>
 
-      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">
         {filtered.map((c) => (
           <ChampionCard
             key={c.id}
@@ -705,7 +780,7 @@ function ImageUrlModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onClick={onClose}
     >
-      <div className="panel w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="panel w-full max-w-sm max-h-[90dvh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 shrink-0">
             <ChampionCard name={champion.name} imageUrl={url || null} size="sm" />

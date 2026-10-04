@@ -237,7 +237,7 @@ export function EditChampionModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onClick={onClose}
     >
-      <div className="panel w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="panel w-full max-w-sm max-h-[90dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <ChampionCard
           name={entry.championName}
           imageUrl={entry.championImageUrl}
