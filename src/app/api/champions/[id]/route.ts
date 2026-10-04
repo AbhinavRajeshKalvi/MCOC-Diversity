@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getDb, toObjectId } from "@/lib/db";
+import { REMOVED_CHAMPIONS, championKey, getDb, toObjectId } from "@/lib/db";
 import { requireOfficer } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
 
@@ -50,10 +50,15 @@ export const DELETE = withErrorHandling(
     if (!championId) return NextResponse.json({ error: "Champion not found." }, { status: 404 });
 
     const db = await getDb();
-    const result = await db.collection("champions").deleteOne({ _id: championId });
-    if (result.deletedCount === 0) {
+    const champion = await db.collection("champions").findOneAndDelete({ _id: championId });
+    if (!champion) {
       return NextResponse.json({ error: "Champion not found." }, { status: 404 });
     }
+    // Remember the removal so the startup seed doesn't add it back.
+    const key = championKey(String(champion.name));
+    await db
+      .collection(REMOVED_CHAMPIONS)
+      .updateOne({ key }, { $set: { key, name: champion.name, removedAt: new Date() } }, { upsert: true });
     // Clean up any roster entries that referenced this champion.
     await db.collection("rosterEntries").deleteMany({ championId });
 

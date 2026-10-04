@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getDb } from "@/lib/db";
+import { REMOVED_CHAMPIONS, championKey, getDb } from "@/lib/db";
 import { getSession, requireOfficer } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
 
@@ -44,6 +44,8 @@ export const POST = withErrorHandling("POST /api/champions", async (req: NextReq
     const result = await db
       .collection("champions")
       .insertOne({ name: parsed.data.name, imageUrl: parsed.data.imageUrl ?? null });
+    // Re-adding a removed champion clears its removal record.
+    await db.collection(REMOVED_CHAMPIONS).deleteOne({ key: championKey(parsed.data.name) });
     return NextResponse.json({
       id: result.insertedId.toString(),
       name: parsed.data.name,

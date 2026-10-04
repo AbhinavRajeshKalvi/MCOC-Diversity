@@ -44,6 +44,14 @@ async function connect(): Promise<MongoClient> {
 
 const CASE_INSENSITIVE = { locale: "en", strength: 2 } as const;
 
+/** Names of champions an officer removed, so the startup seed doesn't re-add them. */
+export const REMOVED_CHAMPIONS = "removedChampions";
+
+/** Case-insensitive key for a champion name in REMOVED_CHAMPIONS. */
+export function championKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 async function initialize(db: Db): Promise<void> {
   const users = db.collection("users");
   const champions = db.collection("champions");
@@ -75,8 +83,15 @@ async function initialize(db: Db): Promise<void> {
   const existingNames = new Set(
     existingChampions.map((champion) => String(champion.name).toLowerCase())
   );
+  // Champions an officer deleted stay deleted; otherwise every restart or
+  // redeploy would add them back from the seed list.
+  const removedNames = new Set(
+    (await db.collection(REMOVED_CHAMPIONS).find({}, { projection: { key: 1 } }).toArray()).map((doc) =>
+      String(doc.key)
+    )
+  );
   const missingChampions = SEED_CHAMPIONS
-    .filter((name) => !existingNames.has(name.toLowerCase()))
+    .filter((name) => !existingNames.has(name.toLowerCase()) && !removedNames.has(championKey(name)))
     .map((name) => ({ name, imageUrl: null as string | null }));
 
   if (missingChampions.length > 0) {

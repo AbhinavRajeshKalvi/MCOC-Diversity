@@ -1,6 +1,6 @@
 // Current MCOC playable champion roster (updated September 11, 2026).
-// This list seeds a brand-new database only; it is not re-applied after the first run.
-// Officers can add, rename, or remove champions from the Admin page.
+// Any name here that's missing from the database is added on startup, unless an
+// officer removed it from the Admin page (see REMOVED_CHAMPIONS in db.ts).
 // Temporary/event-only champions that are no longer playable are intentionally excluded.
 export const SEED_CHAMPIONS: string[] = [
   "Abomination", "Abomination (Immortal)", "Absorbing Man", "Adam Warlock", "Agatha Harkness",
