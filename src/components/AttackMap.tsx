@@ -9,12 +9,11 @@ import {
   MAP_WIDTH,
   NODE_RADIUS,
   PATHS,
-  UPPER_NODES,
+  UPPER_ISLANDS,
   nodeSlot,
   pathLabelPosition,
   pathNodes,
   pathSlot,
-  upperNodeIsland,
   type AttackBoard,
   type AttackMember,
   type AttackSlot
@@ -378,52 +377,61 @@ export default function AttackMap({
             <h2 className="font-display text-lg font-semibold mb-1">Upper islands</h2>
             <p className="text-xs text-parchment-faint mb-3">
               {canPickUpper
-                ? "Take one open spot on a diamond or the boss island. Taking a new spot frees your old one."
+                ? "Take one open spot on any of these islands. Taking a new spot frees your old one."
                 : "Members of this battlegroup pick their own spots here."}
             </p>
-            <ul className="space-y-1.5">
-              {UPPER_NODES.map((node) => {
-                const slot = nodeSlot(node);
-                const holder = holderOf(slot);
-                let control: React.ReactNode = null;
-                if (isOfficer) {
-                  control = (
-                    <MemberSelect
-                      members={board.members}
-                      value={holder?.userId ?? ""}
-                      disabled={savingSlot !== null}
-                      onChange={(userId) => setSlot(slot, userId)}
-                    />
-                  );
-                } else if (viewerInBoard && holder?.userId === viewerId) {
-                  control = (
-                    <button className="btn-ghost px-3 py-1 text-xs" disabled={savingSlot !== null} onClick={() => setSlot(slot, null)}>
-                      Leave
-                    </button>
-                  );
-                } else if (viewerInBoard && !holder) {
-                  control = (
-                    <button className="btn-primary px-3 py-1 text-xs" disabled={savingSlot !== null} onClick={() => setSlot(slot, viewerId)}>
-                      Take
-                    </button>
-                  );
-                }
-                return (
-                  <SlotRow
-                    key={slot}
-                    slot={slot}
-                    title={`Node ${node}`}
-                    subtitle={upperNodeIsland(node)}
-                    holder={holder}
-                    selected={selected === slot}
-                    saving={savingSlot === slot}
-                    viewerId={viewerId}
-                    onSelect={() => setSelected(slot)}
-                    control={control}
-                  />
-                );
-              })}
-            </ul>
+            <div className="space-y-4">
+              {UPPER_ISLANDS.map((island) => (
+                <div key={island.name}>
+                  <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-parchment-dim">
+                    {island.name}
+                  </h3>
+                  <ul className="space-y-1.5">
+                    {island.nodes.map((node) => {
+                      const slot = nodeSlot(node);
+                      const holder = holderOf(slot);
+                      let control: React.ReactNode = null;
+                      if (isOfficer) {
+                        control = (
+                          <MemberSelect
+                            members={board.members}
+                            value={holder?.userId ?? ""}
+                            disabled={savingSlot !== null}
+                            onChange={(userId) => setSlot(slot, userId)}
+                          />
+                        );
+                      } else if (viewerInBoard && holder?.userId === viewerId) {
+                        control = (
+                          <button className="btn-ghost px-3 py-1 text-xs" disabled={savingSlot !== null} onClick={() => setSlot(slot, null)}>
+                            Leave
+                          </button>
+                        );
+                      } else if (viewerInBoard && !holder) {
+                        control = (
+                          <button className="btn-primary px-3 py-1 text-xs" disabled={savingSlot !== null} onClick={() => setSlot(slot, viewerId)}>
+                            Take
+                          </button>
+                        );
+                      }
+                      return (
+                        <SlotRow
+                          key={slot}
+                          slot={slot}
+                          title={`Node ${node}`}
+                          subtitle={node === 50 ? "Boss" : undefined}
+                          holder={holder}
+                          selected={selected === slot}
+                          saving={savingSlot === slot}
+                          viewerId={viewerId}
+                          onSelect={() => setSelected(slot)}
+                          control={control}
+                        />
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </section>
 
           {board.members.length > 0 && (
@@ -477,7 +485,7 @@ function SlotRow({
 }: {
   slot: AttackSlot;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   holder: AttackMember | undefined;
   selected: boolean;
   saving: boolean;
@@ -496,7 +504,7 @@ function SlotRow({
     >
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-parchment">{title}</div>
-        <div className="text-[11px] text-parchment-faint truncate">{subtitle}</div>
+        {subtitle && <div className="text-[11px] text-parchment-faint truncate">{subtitle}</div>}
       </div>
       {saving && <Loader2 size={14} className="animate-spin text-brass-bright shrink-0" aria-hidden />}
       {control ?? (

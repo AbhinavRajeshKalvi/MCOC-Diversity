@@ -38,11 +38,13 @@ export function pathNodes(path: number): number[] {
   return [0, 1, 2, 3].map((row) => row * PATH_COUNT + path);
 }
 
-export function upperNodeIsland(node: number): string {
-  if (node >= 46) return node === 50 ? "Boss" : "Boss island";
-  if (node >= 43) return "Middle diamond";
-  return node >= 40 ? "Left diamond" : "Right diamond";
-}
+/** The upper islands as they appear on the map, left to right with the boss island last. */
+export const UPPER_ISLANDS: { name: string; nodes: number[] }[] = [
+  { name: "Left island", nodes: [40, 41, 42] },
+  { name: "Middle island", nodes: [43, 44, 45] },
+  { name: "Right island", nodes: [37, 38, 39] },
+  { name: "Boss island", nodes: [46, 47, 48, 49, 50] }
+];
 
 export type AttackMember = { userId: string; displayName: string };
 
@@ -106,7 +108,7 @@ for (const cx of COLUMN_X) {
 const DIAMONDS: [number, number, number][] = [
   [40, 0, 275],
   [43, 1, 243],
-  [37, 2, 307]
+  [37, 2, 275]
 ];
 for (const [first, column, y] of DIAMONDS) {
   const cx = COLUMN_X[column]!;
