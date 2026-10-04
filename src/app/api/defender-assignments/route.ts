@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { requireOfficer } from "@/lib/session";
-import { autoSuggest, editSuggestedPlan } from "@/lib/defender-plans";
+import { autoSuggest, clearMemberDefenders, editSuggestedPlan } from "@/lib/defender-plans";
 import { withErrorHandling } from "@/lib/api-handler";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +28,11 @@ const schema = z.discriminatedUnion("action", [
     battlegroup: battlegroupSchema,
     championId: z.string().min(1),
     fromUserId: z.string().min(1)
+  }),
+  z.object({
+    action: z.literal("clear"),
+    battlegroup: battlegroupSchema,
+    userId: z.string().min(1)
   })
 ]);
 
@@ -49,6 +54,11 @@ export const POST = withErrorHandling(
     if (edit.action === "auto-suggest") {
       const assigned = await autoSuggest(db, battlegroup);
       return NextResponse.json({ ok: true, battlegroup, assigned });
+    }
+
+    if (edit.action === "clear") {
+      const cleared = await clearMemberDefenders(db, battlegroup, edit.userId);
+      return NextResponse.json({ ok: true, battlegroup, cleared });
     }
 
     const result = await editSuggestedPlan(db, battlegroup, edit);

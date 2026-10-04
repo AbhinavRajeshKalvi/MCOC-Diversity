@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Plus, Printer, RefreshCw, Search, Sparkles, Trash2, UserPlus, X } from "lucide-react";
+import { Check, Eraser, Plus, Printer, RefreshCw, Search, Shield, Sparkles, Trash2, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { AssignedDefender, BattlegroupBoard, ChampionEntry, MemberDefenderRow, RosterOwner } from "@/lib/diversity";
 import { ascensionLabel } from "@/lib/ascension";
@@ -67,6 +67,8 @@ export default function BattlegroupBoards({
     targetUserId?: string;
   } | null>(null);
   const [rosterMemberId, setRosterMemberId] = useState<string | null>(null);
+  // Member whose open defender slot was clicked: shows their roster minus their own defenders.
+  const [fillMemberId, setFillMemberId] = useState<string | null>(null);
 
   const router = useRouter();
   const board = boards[active];
@@ -172,6 +174,33 @@ export default function BattlegroupBoards({
     }
   }
 
+  async function clearMemberDefenders(member: MemberDefenderRow) {
+    if (!isOfficer) return;
+    const confirmed = window.confirm(
+      `Clear all ${member.assigned} of ${member.displayName}'s defenders from the Battlegroup ${board.battlegroup} suggested plan?\n\nTheir roster is not changed.`
+    );
+    if (!confirmed) return;
+
+    setError(null);
+    setNotice(null);
+
+    const res = await fetch("/api/defender-assignments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "clear", battlegroup: board.battlegroup, userId: member.userId })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error ?? "Couldn't clear that member's defenders.");
+      return;
+    }
+
+    setReassigning(null);
+    setNotice(`${member.displayName}'s defenders were cleared.`);
+    router.refresh();
+  }
+
   async function runAutoSuggest() {
     if (!isOfficer) return;
     const confirmed = window.confirm(
@@ -257,6 +286,7 @@ This discards any manual changes you made to the suggested plan. The current def
               setShowAdd(false);
               setReassigning(null);
               setRosterMemberId(null);
+              setFillMemberId(null);
               setView("suggested");
             }}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -385,12 +415,14 @@ This discards any manual changes you made to the suggested plan. The current def
                   </div>
 
                   <div className="space-y-4">
-                    {board.suggestedDefenders.map((member) => (
+                    {sortByDiversityRating(board.suggestedDefenders).map((member) => (
                       <MemberDefenderRowView
                         key={member.userId}
                         member={member}
                         isOfficer={isOfficer}
                         onDefenderClick={(champion) => setReassigning({ sourceMember: member, champion })}
+                        onEmptySlotClick={isOfficer ? () => setFillMemberId(member.userId) : undefined}
+                        onClear={isOfficer ? () => clearMemberDefenders(member) : undefined}
                       />
                     ))}
                   </div>
@@ -515,6 +547,19 @@ This discards any manual changes you made to the suggested plan. The current def
         />
       )}
 
+      {fillMemberId && isOfficer && (
+        <MemberRosterModal
+          board={board}
+          member={board.suggestedDefenders.find((row) => row.userId === fillMemberId) ?? null}
+          hideOwnDefenders
+          onClose={() => setFillMemberId(null)}
+          onPick={(sourceMember, champion, targetUserId) => {
+            setFillMemberId(null);
+            setReassigning({ sourceMember, champion, targetUserId });
+          }}
+        />
+      )}
+
       {reassigning && isOfficer && (
         <ReassignDefenderModal
           key={`${reassigning.champion.championId}-${reassigning.targetUserId ?? ""}`}
@@ -562,7 +607,7 @@ function CurrentDefenderDiversityView({ board }: { board: BattlegroupBoard }) {
           </div>
         ) : (
           <div className="space-y-4">
-            {board.currentDefenders.map((member) => (
+            {sortByDiversityRating(board.currentDefenders).map((member) => (
               <MemberDefenderRowView
                 key={member.userId}
                 member={member}
@@ -578,10 +623,12 @@ function CurrentDefenderDiversityView({ board }: { board: BattlegroupBoard }) {
         <h1 className="print-title">Battlegroup {board.battlegroup} — Current Defender Diversity</h1>
         <p className="print-subtitle">Current persisted defender assignments</p>
 
-        {board.currentDefenders.map((member) => (
+        {sortByDiversityRating(board.currentDefenders).map((member) => (
           <section key={member.userId} className="print-member">
             <div className="print-member-header">
-              <span>{member.displayName}</span>
+              <span>
+                {member.displayName} · {diversityRating(member).toLocaleString()} PI
+              </span>
               <span>{member.assigned}/{member.cap}</span>
             </div>
             {member.defenders.length === 0 ? (
@@ -701,20 +748,60 @@ const ADDITIONAL_PAGE_SIZE = 24;
 // Lets the browser skip layout/paint for rows that are off screen.
 const OFFSCREEN_SKIP: React.CSSProperties = { contentVisibility: "auto", containIntrinsicSize: "auto 320px" };
 
+/** A member's diversity rating: the total PI of their defenders in the list. */
+function diversityRating(member: MemberDefenderRow) {
+  return member.defenders.reduce((total, defender) => total + (defender.assignedTo.rating ?? 0), 0);
+}
+
+/** Highest diversity rating first; ties by name. */
+function sortByDiversityRating(rows: MemberDefenderRow[]) {
+  return [...rows].sort(
+    (a, b) => diversityRating(b) - diversityRating(a) || a.displayName.localeCompare(b.displayName)
+  );
+}
+
 function MemberDefenderRowView({
   member,
   isOfficer,
-  onDefenderClick
+  onDefenderClick,
+  onEmptySlotClick,
+  onClear
 }: {
   member: MemberDefenderRow;
   isOfficer?: boolean;
   onDefenderClick: (champion: AssignedDefender) => void;
+  /** Officers: pick a defender for an open slot. */
+  onEmptySlotClick?: () => void;
+  /** Officers: remove all of this member's defenders. */
+  onClear?: () => void;
 }) {
   return (
     <div className="rounded-md border border-ink-line bg-ink-raised/30 overflow-hidden" style={OFFSCREEN_SKIP}>
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-ink-line/70">
-        <div className="text-sm font-medium text-parchment truncate">{member.displayName}</div>
-        <div className="stat text-xs text-parchment-faint shrink-0">{member.assigned}/{member.cap}</div>
+        <div className="flex min-w-0 items-baseline gap-2">
+          <div className="text-sm font-medium text-parchment truncate">{member.displayName}</div>
+          <div
+            className="stat inline-flex items-center gap-1 text-xs text-brass-bright shrink-0 self-center"
+            title="Diversity rating: total PI of these defenders"
+          >
+            <Shield size={12} fill="currentColor" aria-hidden />
+            {diversityRating(member).toLocaleString()}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="stat text-xs text-parchment-faint">{member.assigned}/{member.cap}</div>
+          {onClear && member.assigned > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-crimson-bright hover:bg-crimson/10"
+              title={`Clear ${member.displayName}'s defenders`}
+            >
+              <Eraser size={12} />
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 p-2.5">
@@ -731,15 +818,29 @@ function MemberDefenderRowView({
             details={defenderDetails(champion, isOfficer)}
           />
         ))}
-        {Array.from({ length: Math.max(0, member.cap - member.assigned) }).map((_, index) => (
-          <div
-            key={`empty-${index}`}
-            className="aspect-[2/3] rounded-lg border border-dashed border-ink-line bg-ink-panel/40 flex items-center justify-center"
-            aria-label="Open defender slot"
-          >
-            <span className="text-xs text-parchment-faint">Open</span>
-          </div>
-        ))}
+        {Array.from({ length: Math.max(0, member.cap - member.assigned) }).map((_, index) =>
+          onEmptySlotClick ? (
+            <button
+              key={`empty-${index}`}
+              type="button"
+              onClick={onEmptySlotClick}
+              className="aspect-[2/3] rounded-lg border border-dashed border-ink-line bg-ink-panel/40 flex flex-col items-center justify-center gap-1 text-parchment-faint hover:border-brass/60 hover:text-brass-bright transition-colors"
+              aria-label={`Choose a defender for ${member.displayName}`}
+              title={`Choose a defender for ${member.displayName}`}
+            >
+              <Plus size={16} />
+              <span className="text-xs">Open</span>
+            </button>
+          ) : (
+            <div
+              key={`empty-${index}`}
+              className="aspect-[2/3] rounded-lg border border-dashed border-ink-line bg-ink-panel/40 flex items-center justify-center"
+              aria-label="Open defender slot"
+            >
+              <span className="text-xs text-parchment-faint">Open</span>
+            </div>
+          )
+        )}
       </div>
     </div>
   );
@@ -1004,11 +1105,14 @@ function OwnerStatus({ owner }: { owner: RosterOwner }) {
 function MemberRosterModal({
   board,
   member,
+  hideOwnDefenders = false,
   onClose,
   onPick
 }: {
   board: BattlegroupBoard;
   member: MemberDefenderRow | null;
+  /** Leave out champions already in this member's defenders (used to fill an open slot). */
+  hideOwnDefenders?: boolean;
   onClose: () => void;
   onPick: (sourceMember: MemberDefenderRow | null, champion: AssignedDefender, targetUserId: string) => void;
 }) {
@@ -1036,8 +1140,9 @@ function MemberRosterModal({
         return owner ? { champion, owner, assigned: assignment.get(champion.championId) ?? null } : null;
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+      .filter((entry) => !hideOwnDefenders || entry.assigned?.row.userId !== member.userId)
       .sort((a, b) => (b.owner.rating ?? -1) - (a.owner.rating ?? -1) || a.champion.championName.localeCompare(b.champion.championName));
-  }, [board, member]);
+  }, [board, member, hideOwnDefenders]);
 
   if (!member) return null;
 
@@ -1061,10 +1166,13 @@ function MemberRosterModal({
         <div className="p-5 border-b border-ink-line">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="font-display text-xl tracking-wide text-parchment">{member.displayName}&apos;s roster</h3>
+              <h3 className="font-display text-xl tracking-wide text-parchment">
+                {hideOwnDefenders ? `Choose a defender for ${member.displayName}` : `${member.displayName}'s roster`}
+              </h3>
               <p className="text-xs text-parchment-faint mt-1">
-                {roster.length} champions · {member.assigned}/{member.cap} defenders in the suggested plan. Click a champion to
-                add it to {member.displayName}&apos;s defenders.
+                {hideOwnDefenders
+                  ? `${roster.length} champions not already in their defenders · ${member.assigned}/${member.cap} slots used. A red border means someone else has it equipped; picking it moves it to ${member.displayName}.`
+                  : `${roster.length} champions · ${member.assigned}/${member.cap} defenders in the suggested plan. Click a champion to add it to ${member.displayName}'s defenders.`}
               </p>
             </div>
             <button onClick={onClose} className="text-parchment-faint hover:text-parchment" aria-label="Close">
@@ -1085,7 +1193,11 @@ function MemberRosterModal({
         <div className="overflow-y-auto p-5">
           {filtered.length === 0 ? (
             <div className="panel p-6 text-center text-parchment-faint">
-              {roster.length === 0 ? `${member.displayName} hasn't added any champions yet.` : `No champions match “${search}”.`}
+              {roster.length === 0
+                ? hideOwnDefenders
+                  ? `${member.displayName} has no other champions to add.`
+                  : `${member.displayName} hasn't added any champions yet.`
+                : `No champions match “${search}”.`}
             </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
@@ -1108,12 +1220,12 @@ function MemberRosterModal({
                         <div className="stat text-[10px] text-parchment-dim truncate">{piText(entry.owner.rating)}</div>
                         <div
                           className={`text-[9px] truncate ${inOwnPlan ? "text-teal-bright" : "text-brass-bright/80"}`}
-                          title={entry.assigned && !inOwnPlan ? `With ${entry.assigned.row.displayName}` : undefined}
+                          title={entry.assigned && !inOwnPlan ? `Equipped by ${entry.assigned.row.displayName}` : undefined}
                         >
                           {inOwnPlan
                             ? "In their defenders"
                             : entry.assigned
-                            ? `With ${entry.assigned.row.displayName}`
+                            ? `Equipped by ${entry.assigned.row.displayName}`
                             : "Click to assign"}
                         </div>
                       </>

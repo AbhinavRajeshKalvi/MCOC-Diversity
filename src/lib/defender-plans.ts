@@ -237,3 +237,11 @@ export async function editSuggestedPlan(
 
   return { status: 200 };
 }
+
+/** Empties one member's defenders in the saved suggested plan. */
+export async function clearMemberDefenders(db: Db, battlegroup: number, userId: string) {
+  const userObjId = toObjectId(userId);
+  if (!userObjId) return 0;
+  const result = await db.collection(COLLECTIONS.suggested).deleteMany({ battlegroup, userId: idFilter(userObjId) });
+  return result.deletedCount;
+}

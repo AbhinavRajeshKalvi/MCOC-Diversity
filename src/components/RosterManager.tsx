@@ -186,13 +186,13 @@ export default function RosterManager({
   );
 }
 
-function EditChampionModal({
+export function EditChampionModal({
   entry,
   onClose,
   onSave,
   onRemove
 }: {
-  entry: RosterEntry;
+  entry: Omit<RosterEntry, "source">;
   onClose: () => void;
   onSave: (id: string, form: { stars: number; rating: number | null; awakened: boolean; ascended: number; rank: number | null; sigLevel: number | null }) => Promise<void>;
   onRemove: (id: string) => Promise<void>;

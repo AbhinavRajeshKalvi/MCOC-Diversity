@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Crown, Gem, Link2, Plus, Search, Shield, Trash2 } from "lucide-react";
 import ChampionCard from "./ChampionCard";
+import ChampionPicker from "./ChampionPicker";
+import { EditChampionModal } from "./RosterManager";
 import { isLeaderOrAbove, type Role } from "@/lib/roles";
 
 type Viewer = { userId: string; role: Role };
@@ -30,6 +32,7 @@ export default function AdminPanel({
   return (
     <div className="space-y-10">
       <MembersSection initialUsers={initialUsers} viewer={viewer} />
+      <MemberRosterSection users={initialUsers} champions={initialChampions} />
       <ChampionsSection initialChampions={initialChampions} />
     </div>
   );
@@ -342,6 +345,210 @@ function AddMemberForm({
         </button>
       </div>
     </form>
+  );
+}
+
+type MemberRosterEntry = {
+  id: string;
+  championId: string;
+  championName: string;
+  championImageUrl: string | null;
+  stars: number | null;
+  rank: number | null;
+  sigLevel: number | null;
+  rating: number | null;
+  awakened: boolean | null;
+  ascended: number | null;
+};
+
+// Officers, the Leader and the Admin can add champions to any member's roster
+// (the admin page is already limited to them; the API checks again).
+function MemberRosterSection({ users, champions }: { users: User[]; champions: Champion[] }) {
+  const [memberId, setMemberId] = useState("");
+  const [roster, setRoster] = useState<MemberRosterEntry[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const selectedRef = useRef("");
+  const [editing, setEditing] = useState<MemberRosterEntry | null>(null);
+
+  const member = users.find((u) => u.id === memberId) ?? null;
+  const ownedIds = useMemo(() => new Set((roster ?? []).map((entry) => entry.championId)), [roster]);
+  const available = useMemo(() => champions.filter((c) => !ownedIds.has(c.id)), [champions, ownedIds]);
+  const sortedRoster = useMemo(
+    () =>
+      [...(roster ?? [])].sort(
+        (a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.championName.localeCompare(b.championName)
+      ),
+    [roster]
+  );
+
+  async function loadRoster(userId: string) {
+    const res = await fetch(`/api/roster?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok || !Array.isArray(data.roster)) throw new Error(data.error ?? "Couldn't load that roster.");
+    return data.roster as MemberRosterEntry[];
+  }
+
+  async function selectMember(userId: string) {
+    selectedRef.current = userId;
+    setEditing(null);
+    setMemberId(userId);
+    setRoster(null);
+    setError(null);
+    setNotice(null);
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const loaded = await loadRoster(userId);
+      // Ignore a slow response for a member who is no longer selected.
+      if (selectedRef.current === userId) setRoster(loaded);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't load that roster.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addChampion(form: {
+    championId: string;
+    stars: number;
+    awakened: boolean;
+    ascended: number;
+    rating: number;
+    rank: number | null;
+    sigLevel: number | null;
+  }) {
+    if (!member) return;
+    setError(null);
+    setNotice(null);
+    const res = await fetch("/api/roster", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, userId: member.id })
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error ?? "Couldn't add that champion.");
+      throw new Error("add failed");
+    }
+    const name = champions.find((c) => c.id === form.championId)?.name ?? "Champion";
+    setNotice(`${name} was added to ${member.displayName}'s roster.`);
+    setRoster(await loadRoster(member.id));
+  }
+
+  async function updateEntry(
+    id: string,
+    form: { stars: number; rating: number | null; awakened: boolean; ascended: number; rank: number | null; sigLevel: number | null }
+  ) {
+    if (!member) return;
+    setError(null);
+    setNotice(null);
+    const res = await fetch(`/api/roster/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form)
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error ?? "Couldn't save that change.");
+      return;
+    }
+    const name = roster?.find((entry) => entry.id === id)?.championName ?? "Champion";
+    setNotice(`${name} was updated on ${member.displayName}'s roster.`);
+    setRoster(await loadRoster(member.id));
+  }
+
+  async function removeEntry(id: string) {
+    if (!member) return;
+    const name = roster?.find((entry) => entry.id === id)?.championName ?? "this champion";
+    if (!window.confirm(`Remove ${name} from ${member.displayName}'s roster?`)) return;
+    setError(null);
+    setNotice(null);
+    const res = await fetch(`/api/roster/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error ?? "Couldn't remove that champion.");
+      return;
+    }
+    setNotice(`${name} was removed from ${member.displayName}'s roster.`);
+    setRoster((current) => (current ?? []).filter((entry) => entry.id !== id));
+  }
+
+  return (
+    <section>
+      <h2 className="font-display text-2xl tracking-wide text-parchment mb-1">Edit a member&apos;s roster</h2>
+      <p className="text-sm text-parchment-faint mb-4">
+        Choose a member, then pick a champion to add it to their roster. Click a champion already in their roster to
+        change its stars, PI, rank, signature level and awakening, or to remove it.
+      </p>
+
+      <div className="panel p-5 space-y-4">
+        <div className="max-w-sm">
+          <label className="field-label">Member</label>
+          <select className="field-input" value={memberId} onChange={(e) => selectMember(e.target.value)}>
+            <option value="">Select a member…</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.displayName} (@{u.username})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {notice && (
+          <p className="text-sm text-teal-bright bg-teal/10 border border-teal/30 rounded-sm px-3 py-2">{notice}</p>
+        )}
+        {error && <p className="text-sm text-crimson-bright">{error}</p>}
+
+        {member && loading && <p className="text-sm text-parchment-faint">Loading {member.displayName}&apos;s roster…</p>}
+
+        {member && roster && (
+          <>
+            <ChampionPicker champions={available} onAdd={addChampion} />
+
+            <div>
+              <h3 className="font-display text-lg tracking-wide text-parchment mb-3">
+                {member.displayName}&apos;s roster <span className="text-parchment-faint text-base">({roster.length})</span>
+              </h3>
+              {roster.length === 0 ? (
+                <p className="text-sm text-parchment-faint">{member.displayName} has no champions yet.</p>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-[28rem] overflow-y-auto pr-1">
+                  {sortedRoster.map((entry) => (
+                    <ChampionCard
+                      key={entry.id}
+                      name={entry.championName}
+                      imageUrl={entry.championImageUrl}
+                      size="sm"
+                      onClick={() => setEditing(entry)}
+                      awakened={entry.awakened}
+                      ascended={entry.ascended}
+                      stats={entry}
+                      details={
+                        <div className="stat text-[10px] text-parchment-dim truncate">
+                          {entry.rating != null ? `${entry.rating.toLocaleString()} PI` : "PI —"}
+                        </div>
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {editing && (
+        <EditChampionModal
+          key={editing.id}
+          entry={editing}
+          onClose={() => setEditing(null)}
+          onSave={updateEntry}
+          onRemove={removeEntry}
+        />
+      )}
+    </section>
   );
 }
 

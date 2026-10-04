@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, ObjectId, toObjectId } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { isOfficerRole } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/api-handler";
+
+// Members edit their own entries; officers, the Leader and the Admin can edit anyone's.
+function entryFilter(entryId: ObjectId, session: { userId: string; role: string }) {
+  return isOfficerRole(session.role) ? { _id: entryId } : { _id: entryId, userId: new ObjectId(session.userId) };
+}
 
 const schema = z.object({
   stars: z.number().int().min(1).max(7),
@@ -37,7 +43,7 @@ export const PATCH = withErrorHandling(
 
     const db = await getDb();
     const result = await db.collection("rosterEntries").updateOne(
-      { _id: entryId, userId: new ObjectId(session.userId) },
+      entryFilter(entryId, session),
       { $set: { ...parsed.data, updatedAt: new Date() } }
     );
 
@@ -60,7 +66,7 @@ export const DELETE = withErrorHandling(
     const db = await getDb();
     const result = await db
       .collection("rosterEntries")
-      .deleteOne({ _id: entryId, userId: new ObjectId(session.userId) });
+      .deleteOne(entryFilter(entryId, session));
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Entry not found." }, { status: 404 });
