@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import ChampionCard from "./ChampionCard";
 import StarRating from "./StarRating";
+import { ROSTER_FX, flyToRoster } from "@/lib/roster-fx";
 
 type Champion = { id: string; name: string; imageUrl: string | null };
 
@@ -74,6 +75,7 @@ function AddChampionModal({
   const [sigLevel, setSigLevel] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   async function submit() {
     const pi = Number(rating);
@@ -95,6 +97,8 @@ function AddChampionModal({
     setError(null);
     try {
       await onAdd({ championId: champion.id, stars, awakened, ascended, rating: pi, rank: rankValue, sigLevel: sigValue });
+      // The popup shrinks and flies into the roster; it copies the popup before it closes.
+      if (ROSTER_FX && panelRef.current) void flyToRoster(panelRef.current, champion.id);
       onClose();
     } catch {
       setError("Couldn't add that champion. Try again.");
@@ -109,6 +113,7 @@ function AddChampionModal({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
         className="panel w-full max-w-sm max-h-[90dvh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >

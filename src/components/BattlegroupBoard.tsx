@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Eraser, Plus, Printer, RefreshCw, Search, Shield, Sparkles, Trash2, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { AssignedDefender, BattlegroupBoard, ChampionEntry, MemberDefenderRow, RosterOwner } from "@/lib/diversity";
 import { ascensionLabel } from "@/lib/ascension";
 import ChampionCard from "./ChampionCard";
+import SlidingTabs from "./SlidingTabs";
+import { dealIn, flyFromSnapshot, snapshotPositions, stamp } from "@/lib/board-fx";
 
 type BattlegroupMember = {
   userId: string;
@@ -74,6 +76,33 @@ export default function BattlegroupBoards({
   const router = useRouter();
   const board = boards[active];
 
+  // Animations wait for the refreshed board to arrive from the server, then
+  // play against the new cards. `before` holds where cards were for moves.
+  const fxRef = useRef<HTMLDivElement>(null);
+  const pendingFx = useRef<{
+    kind: "publish" | "suggest" | "move";
+    battlegroup: number;
+    before?: ReturnType<typeof snapshotPositions>;
+    movedId?: string | null;
+  } | null>(null);
+
+  function queueMoveFx(movedId: string | null) {
+    pendingFx.current = { kind: "move", battlegroup: board.battlegroup, before: snapshotPositions(fxRef.current), movedId };
+  }
+
+  useLayoutEffect(() => {
+    const fx = pendingFx.current;
+    if (!fx || fx.battlegroup !== board.battlegroup) return;
+    pendingFx.current = null;
+    const rows = fxRef.current?.querySelector<HTMLElement>("[data-fx-rows]") ?? null;
+    if (fx.kind === "move") flyFromSnapshot(fxRef.current, fx.before!, fx.movedId ?? null);
+    else if (fx.kind === "suggest") dealIn(rows, "deal");
+    else {
+      dealIn(rows, "flip");
+      stamp(rows ?? fxRef.current, "Published", 250);
+    }
+  }, [boards, board.battlegroup]);
+
   // Keep the open Battlegroup and tab in the URL so a page refresh returns to them.
   function rememberLocation(battlegroup: number, nextView: BoardView) {
     const url = new URL(window.location.href);
@@ -115,6 +144,7 @@ export default function BattlegroupBoards({
   async function handleRemoveDefender(sourceMember: MemberDefenderRow, champion: AssignedDefender) {
     setError(null);
     setNotice(null);
+    queueMoveFx(null);
 
     const res = await fetch("/api/defender-assignments", {
       method: "POST",
@@ -164,6 +194,7 @@ export default function BattlegroupBoards({
         return;
       }
 
+      pendingFx.current = { kind: "publish", battlegroup: board.battlegroup };
       setView("current");
       rememberLocation(board.battlegroup, "current");
       setNotice(
@@ -184,6 +215,7 @@ export default function BattlegroupBoards({
 
     setError(null);
     setNotice(null);
+    queueMoveFx(null);
 
     const res = await fetch("/api/defender-assignments", {
       method: "POST",
@@ -229,6 +261,7 @@ This discards any manual changes you made to the suggested plan. The current def
       }
 
       setReassigning(null);
+      pendingFx.current = { kind: "suggest", battlegroup: board.battlegroup };
       setNotice(`Battlegroup ${board.battlegroup} suggested plan was rebuilt (${data.assigned} defenders).`);
       router.refresh();
     } finally {
@@ -244,6 +277,7 @@ This discards any manual changes you made to the suggested plan. The current def
   ) {
     setError(null);
     setNotice(null);
+    queueMoveFx(champion.championId);
 
     const res = await fetch("/api/defender-assignments", {
       method: "POST",
@@ -275,255 +309,257 @@ This discards any manual changes you made to the suggested plan. The current def
 
   return (
     <div>
-      <div className="flex w-full sm:inline-flex sm:w-auto flex-wrap gap-1 mb-6 p-1 rounded-xl border border-ink-line/80 bg-ink-panel/80 shadow-panel">
-        {boards.map((b, i) => (
-          <button
-            key={b.battlegroup}
-            onClick={() => {
-              setActive(i);
-              rememberLocation(b.battlegroup, "suggested");
-              setError(null);
-              setNotice(null);
-              setShowAdd(false);
-              setReassigning(null);
-              setRosterMemberId(null);
-              setFillMemberId(null);
-              setView("suggested");
-            }}
-            className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg font-display text-base font-semibold uppercase tracking-wider whitespace-nowrap transition-all ${
-              i === active
-                ? "bg-gradient-to-b from-brass-bright to-brass text-ink shadow-[0_4px_14px_-4px_rgba(246,200,97,0.6)]"
-                : "text-parchment-dim hover:text-parchment hover:bg-white/[0.05]"
-            }`}
-          >
-            <span className="sm:hidden">BG</span>
-            <span className="hidden sm:inline">Battlegroup</span> {b.battlegroup}
-          </button>
-        ))}
-      </div>
+      <SlidingTabs
+        tabs={boards.map((b) => ({
+          key: b.battlegroup,
+          label: (
+            <>
+              <span className="sm:hidden">BG</span>
+              <span className="hidden sm:inline">Battlegroup</span> {b.battlegroup}
+            </>
+          )
+        }))}
+        active={active}
+        onSelect={(i) => {
+          setActive(i);
+          rememberLocation(boards[i]!.battlegroup, "suggested");
+          setError(null);
+          setNotice(null);
+          setShowAdd(false);
+          setReassigning(null);
+          setRosterMemberId(null);
+          setFillMemberId(null);
+          setView("suggested");
+        }}
+      />
 
-      {notice && <p className="text-sm text-teal-bright mb-4">{notice}</p>}
-      {error && <p className="text-sm text-crimson-bright mb-4">{error}</p>}
+      <div key={board.battlegroup} className="fx-fade-in">
+        {notice && <p className="text-sm text-teal-bright mb-4">{notice}</p>}
+        {error && <p className="text-sm text-crimson-bright mb-4">{error}</p>}
 
-      {board.memberCount === 0 ? (
-        <div className="panel p-8 text-center text-parchment-faint">
-          <p>No members are assigned to Battlegroup {board.battlegroup} yet.</p>
-          {isOfficer && availableUsers.length > 0 && (
-            <button onClick={() => setShowAdd(true)} className="btn-primary mt-4">
-              <UserPlus size={15} />
-              Add member
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="grid xl:grid-cols-4 gap-6">
-          <div className="xl:col-span-3 min-w-0 space-y-6">
-            <section className="panel p-5 print:hidden">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex w-full sm:inline-flex sm:w-auto gap-1 p-1 rounded-lg border border-ink-line/80 bg-ink/60">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView("suggested");
-                      rememberLocation(board.battlegroup, "suggested");
-                      setReassigning(null);
-                    }}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all ${
-                      view === "suggested"
-                        ? "bg-ink-raised text-brass-bright shadow-[inset_0_0_0_1px_rgba(246,200,97,0.35)]"
-                        : "text-parchment-dim hover:text-parchment"
-                    }`}
-                  >
-                    Suggested<span className="hidden sm:inline"> defender diversity</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView("current");
-                      rememberLocation(board.battlegroup, "current");
-                      setReassigning(null);
-                    }}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all ${
-                      view === "current"
-                        ? "bg-ink-raised text-brass-bright shadow-[inset_0_0_0_1px_rgba(246,200,97,0.35)]"
-                        : "text-parchment-dim hover:text-parchment"
-                    }`}
-                  >
-                    Current<span className="hidden sm:inline"> defender diversity</span>
-                  </button>
-                </div>
-
-                {view === "suggested" && isOfficer && (
-                  <div className="flex w-full sm:w-auto flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={runAutoSuggest}
-                      disabled={autoSuggesting}
-                      className="btn-ghost w-full sm:w-auto"
-                      title="Rebuild the suggested plan from the best defenders and highest PI"
-                    >
-                      <Sparkles size={15} />
-                      {autoSuggesting ? "Suggesting…" : "Auto-suggest"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={publishSuggested}
-                      disabled={publishing}
-                      className="btn-primary w-full sm:w-auto"
-                      title="Replace the persisted current defender list with this suggested plan"
-                    >
-                      <RefreshCw size={15} />
-                      {publishing ? "Replacing…" : "Replace current with suggested"}
-                    </button>
-                  </div>
-                )}
-
-                {view === "current" && (
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="btn-ghost w-full sm:w-auto"
-                  >
-                    <Printer size={15} />
-                    Print / Save as PDF
-                  </button>
-                )}
-              </div>
-            </section>
-
-            {view === "suggested" ? (
-              <>
-                <section className="panel p-5">
-                  <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-                    <div>
-                      <h2 className="font-display text-xl tracking-wide text-parchment">Suggested defenders</h2>
-                      <p className="text-xs text-parchment-faint mt-1">
-                        Up to 5 defenders for each member. Your manual changes stay put; use Auto-suggest to rebuild the
-                        plan from the best defenders and highest PI.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-5 text-right">
-                      <div>
-                        <div className="stat text-2xl text-brass-bright leading-none">
-                          {board.uniqueChampionsAssigned}/{board.maxDefenders}
-                        </div>
-                        <div className="text-xs text-parchment-faint">defender slots</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    {sortByDiversityRating(board.suggestedDefenders).map((member) => (
-                      <MemberDefenderRowView
-                        key={member.userId}
-                        member={member}
-                        isOfficer={isOfficer}
-                        onDefenderClick={(champion) => setReassigning({ sourceMember: member, champion })}
-                        onEmptySlotClick={isOfficer ? () => setFillMemberId(member.userId) : undefined}
-                        onClear={isOfficer ? () => clearMemberDefenders(member) : undefined}
-                      />
-                    ))}
-                  </div>
-                </section>
-
-                <AdditionalDefendersSection
-                  key={`suggested-${board.battlegroup}`}
-                  defenders={board.additionalPossibleDefenders}
-                  isOfficer={isOfficer}
-                  description="Every other available champion, ordered by defensive quality and PI. Officers can click any champion to assign it."
-                  onPick={(champion) => setReassigning({ sourceMember: null, champion })}
-                />
-              </>
-            ) : (
-              <CurrentDefenderDiversityView board={board} />
+        {board.memberCount === 0 ? (
+          <div className="panel p-8 text-center text-parchment-faint">
+            <p>No members are assigned to Battlegroup {board.battlegroup} yet.</p>
+            {isOfficer && availableUsers.length > 0 && (
+              <button onClick={() => setShowAdd(true)} className="btn-primary mt-4">
+                <UserPlus size={15} />
+                Add member
+              </button>
             )}
           </div>
-
-          <aside className="min-w-0 grid content-start gap-6 md:grid-cols-2 xl:grid-cols-1 print:hidden">
-            {isOfficer && (
-              <section className="panel p-5 md:row-span-2 xl:row-span-1">
-                <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-3">
-                  <div>
-                    <h2 className="font-display text-xl tracking-wide text-parchment">Battlegroup members</h2>
-                    <p className="text-xs text-parchment-faint mt-1">{members.length}/10 members</p>
+        ) : (
+          <div className="grid xl:grid-cols-4 gap-6">
+            <div ref={fxRef} className="xl:col-span-3 min-w-0 space-y-6">
+              <section className="panel p-5 print:hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex w-full sm:inline-flex sm:w-auto gap-1 p-1 rounded-lg border border-ink-line/80 bg-ink/60">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView("suggested");
+                        rememberLocation(board.battlegroup, "suggested");
+                        setReassigning(null);
+                      }}
+                      className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all ${
+                        view === "suggested"
+                          ? "bg-ink-raised text-brass-bright shadow-[inset_0_0_0_1px_rgba(246,200,97,0.35)]"
+                          : "text-parchment-dim hover:text-parchment"
+                      }`}
+                    >
+                      Suggested<span className="hidden sm:inline"> defender diversity</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView("current");
+                        rememberLocation(board.battlegroup, "current");
+                        setReassigning(null);
+                      }}
+                      className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all ${
+                        view === "current"
+                          ? "bg-ink-raised text-brass-bright shadow-[inset_0_0_0_1px_rgba(246,200,97,0.35)]"
+                          : "text-parchment-dim hover:text-parchment"
+                      }`}
+                    >
+                      Current<span className="hidden sm:inline"> defender diversity</span>
+                    </button>
                   </div>
-                  <span className="stat text-sm text-brass-bright">{members.length * 5}/50</span>
-                </div>
 
-                <ul className="space-y-2.5">
-                  {members.map((member) => {
-                    const usage = board.slotUsage.find((slot) => slot.userId === member.userId);
-                    const removing = savingUserId === member.userId;
-                    return (
-                      <li
-                        key={member.userId}
-                        className="flex items-center gap-2 rounded-sm bg-ink-raised/50 px-2.5 py-2"
+                  {view === "suggested" && isOfficer && (
+                    <div className="flex w-full sm:w-auto flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={runAutoSuggest}
+                        disabled={autoSuggesting}
+                        className="btn-ghost w-full sm:w-auto"
+                        title="Rebuild the suggested plan from the best defenders and highest PI"
                       >
-                        <div className="min-w-0 flex-1">
+                        <Sparkles size={15} />
+                        {autoSuggesting ? "Suggesting…" : "Auto-suggest"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={publishSuggested}
+                        disabled={publishing}
+                        className="btn-primary w-full sm:w-auto"
+                        title="Replace the persisted current defender list with this suggested plan"
+                      >
+                        <RefreshCw size={15} />
+                        {publishing ? "Replacing…" : "Replace current with suggested"}
+                      </button>
+                    </div>
+                  )}
+
+                  {view === "current" && (
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="btn-ghost w-full sm:w-auto"
+                    >
+                      <Printer size={15} />
+                      Print / Save as PDF
+                    </button>
+                  )}
+                </div>
+              </section>
+
+              <div key={view} className="fx-fade-in space-y-6">
+                {view === "suggested" ? (
+                  <>
+                    <section className="panel p-5">
+                      <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
+                        <div>
+                          <h2 className="font-display text-xl tracking-wide text-parchment">Suggested defenders</h2>
+                          <p className="text-xs text-parchment-faint mt-1">
+                            Up to 5 defenders for each member. Your manual changes stay put; use Auto-suggest to rebuild the
+                            plan from the best defenders and highest PI.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-5 text-right">
+                          <div>
+                            <div className="stat text-2xl text-brass-bright leading-none">
+                              {board.uniqueChampionsAssigned}/{board.maxDefenders}
+                            </div>
+                            <div className="text-xs text-parchment-faint">defender slots</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4" data-fx-rows>
+                        {sortByDiversityRating(board.suggestedDefenders).map((member) => (
+                          <MemberDefenderRowView
+                            key={member.userId}
+                            member={member}
+                            isOfficer={isOfficer}
+                            onDefenderClick={(champion) => setReassigning({ sourceMember: member, champion })}
+                            onEmptySlotClick={isOfficer ? () => setFillMemberId(member.userId) : undefined}
+                            onClear={isOfficer ? () => clearMemberDefenders(member) : undefined}
+                          />
+                        ))}
+                      </div>
+                    </section>
+
+                    <AdditionalDefendersSection
+                      key={`suggested-${board.battlegroup}`}
+                      defenders={board.additionalPossibleDefenders}
+                      isOfficer={isOfficer}
+                      description="Every other available champion, ordered by defensive quality and PI. Officers can click any champion to assign it."
+                      onPick={(champion) => setReassigning({ sourceMember: null, champion })}
+                    />
+                  </>
+                ) : (
+                  <CurrentDefenderDiversityView board={board} />
+                )}
+              </div>
+            </div>
+
+            <aside className="min-w-0 grid content-start gap-6 md:grid-cols-2 xl:grid-cols-1 print:hidden">
+              {isOfficer && (
+                <section className="panel p-5 md:row-span-2 xl:row-span-1">
+                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-3">
+                    <div>
+                      <h2 className="font-display text-xl tracking-wide text-parchment">Battlegroup members</h2>
+                      <p className="text-xs text-parchment-faint mt-1">{members.length}/10 members</p>
+                    </div>
+                    <span className="stat text-sm text-brass-bright">{members.length * 5}/50</span>
+                  </div>
+
+                  <ul className="space-y-2.5">
+                    {members.map((member) => {
+                      const usage = board.slotUsage.find((slot) => slot.userId === member.userId);
+                      const removing = savingUserId === member.userId;
+                      return (
+                        <li
+                          key={member.userId}
+                          className="flex items-center gap-2 rounded-sm bg-ink-raised/50 px-2.5 py-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <button
+                              type="button"
+                              onClick={() => setRosterMemberId(member.userId)}
+                              className="block max-w-full text-left text-sm text-parchment truncate hover:text-brass-bright hover:underline"
+                              title={`View ${member.displayName}'s roster`}
+                            >
+                              {member.displayName}
+                            </button>
+                            <div className="stat text-[11px] text-parchment-faint">{usage?.assigned ?? 0}/5 defenders</div>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => setRosterMemberId(member.userId)}
-                            className="block max-w-full text-left text-sm text-parchment truncate hover:text-brass-bright hover:underline"
-                            title={`View ${member.displayName}'s roster`}
+                            onClick={() => updateBattlegroup(member, null)}
+                            disabled={removing}
+                            className="shrink-0 p-1.5 rounded-sm text-crimson-bright hover:bg-crimson/10 disabled:opacity-40"
+                            title={`Remove ${member.displayName} from Battlegroup ${board.battlegroup}`}
+                            aria-label={`Remove ${member.displayName} from Battlegroup ${board.battlegroup}`}
                           >
-                            {member.displayName}
+                            <Trash2 size={15} />
                           </button>
-                          <div className="stat text-[11px] text-parchment-faint">{usage?.assigned ?? 0}/5 defenders</div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => updateBattlegroup(member, null)}
-                          disabled={removing}
-                          className="shrink-0 p-1.5 rounded-sm text-crimson-bright hover:bg-crimson/10 disabled:opacity-40"
-                          title={`Remove ${member.displayName} from Battlegroup ${board.battlegroup}`}
-                          aria-label={`Remove ${member.displayName} from Battlegroup ${board.battlegroup}`}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                        </li>
+                      );
+                    })}
+                  </ul>
 
-                <button
-                  type="button"
-                  onClick={() => setShowAdd(true)}
-                  disabled={members.length >= 10 || availableUsers.length === 0}
-                  className="btn-ghost w-full mt-4"
-                >
-                  <Plus size={15} />
-                  {members.length >= 10 ? "Battlegroup full" : "Add member"}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdd(true)}
+                    disabled={members.length >= 10 || availableUsers.length === 0}
+                    className="btn-ghost w-full mt-4"
+                  >
+                    <Plus size={15} />
+                    {members.length >= 10 ? "Battlegroup full" : "Add member"}
+                  </button>
+                </section>
+              )}
+
+              <section className="panel p-5">
+                <h2 className="font-display text-xl tracking-wide text-parchment mb-3">Defender plan</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-ink-raised rounded-sm p-3">
+                    <div className="stat text-xl text-brass-bright">{board.uniqueChampionsAssigned}</div>
+                    <div className="text-xs text-parchment-faint">unique defenders</div>
+                  </div>
+                  <div className="bg-ink-raised rounded-sm p-3">
+                    <div className="stat text-xl text-brass-bright">{board.mediumAssigned}</div>
+                    <div className="text-xs text-parchment-faint">medium used</div>
+                  </div>
+                </div>
+                <p className="text-xs text-parchment-faint mt-3">
+                  Priority defenders are selected first; medium defenders only fill remaining capacity.
+                </p>
               </section>
-            )}
 
-            <section className="panel p-5">
-              <h2 className="font-display text-xl tracking-wide text-parchment mb-3">Defender plan</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-ink-raised rounded-sm p-3">
-                  <div className="stat text-xl text-brass-bright">{board.uniqueChampionsAssigned}</div>
-                  <div className="text-xs text-parchment-faint">unique defenders</div>
-                </div>
-                <div className="bg-ink-raised rounded-sm p-3">
-                  <div className="stat text-xl text-brass-bright">{board.mediumAssigned}</div>
-                  <div className="text-xs text-parchment-faint">medium used</div>
-                </div>
-              </div>
-              <p className="text-xs text-parchment-faint mt-3">
-                Priority defenders are selected first; medium defenders only fill remaining capacity.
-              </p>
-            </section>
+              <section className="panel p-5">
+                <h2 className="font-display text-xl tracking-wide text-parchment mb-3">Estimated diversity score</h2>
+                <div className="stat text-3xl text-brass-bright">{board.estimatedDiversityPoints.toLocaleString()}</div>
+                <p className="text-xs text-parchment-faint mt-1">
+                  {board.uniqueChampionsAssigned} unique defenders × {board.pointsPerUniqueDefender} pts. Treat this as a planning estimate, not the official total.
+                </p>
+              </section>
+            </aside>
+          </div>
+        )}
 
-            <section className="panel p-5">
-              <h2 className="font-display text-xl tracking-wide text-parchment mb-3">Estimated diversity score</h2>
-              <div className="stat text-3xl text-brass-bright">{board.estimatedDiversityPoints.toLocaleString()}</div>
-              <p className="text-xs text-parchment-faint mt-1">
-                {board.uniqueChampionsAssigned} unique defenders × {board.pointsPerUniqueDefender} pts. Treat this as a planning estimate, not the official total.
-              </p>
-            </section>
-          </aside>
-        </div>
-      )}
+      </div>
 
       {showAdd && isOfficer && (
         <AddMemberModal
@@ -600,7 +636,7 @@ function CurrentDefenderDiversityView({ board }: { board: BattlegroupBoard }) {
             No current defender assignments have been published for this Battlegroup yet.
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4" data-fx-rows>
             {sortByDiversityRating(board.currentDefenders).map((member) => (
               <MemberDefenderRowView
                 key={member.userId}
@@ -711,17 +747,18 @@ function AdditionalDefendersSection({
       ) : (
         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
           {shown.map((c) => (
-            <ChampionCard
-              key={c.championId}
-              name={c.championName}
-              imageUrl={c.championImageUrl}
-              size="sm"
-              onClick={isOfficer ? () => onPick(c) : undefined}
-              awakened={c.assignedTo.awakened}
-              ascended={c.assignedTo.ascended}
-              stats={c.assignedTo}
-              details={defenderDetails(c, isOfficer, "Click to assign")}
-            />
+            <div key={c.championId} data-flip-id={c.championId}>
+              <ChampionCard
+                name={c.championName}
+                imageUrl={c.championImageUrl}
+                size="sm"
+                onClick={isOfficer ? () => onPick(c) : undefined}
+                awakened={c.assignedTo.awakened}
+                ascended={c.assignedTo.ascended}
+                stats={c.assignedTo}
+                details={defenderDetails(c, isOfficer, "Click to assign")}
+              />
+            </div>
           ))}
         </div>
       )}
@@ -809,18 +846,19 @@ function MemberDefenderRowView({
 
       <div className={`grid gap-2 p-2.5 ${forPrint ? "grid-cols-5" : "grid-cols-3 sm:grid-cols-5"}`}>
         {member.defenders.map((champion) => (
-          <ChampionCard
-            key={champion.championId}
-            name={champion.championName}
-            imageUrl={champion.championImageUrl}
-            size="sm"
-            eager={forPrint}
-            onClick={isOfficer ? () => onDefenderClick(champion) : undefined}
-            awakened={champion.assignedTo.awakened}
-            ascended={champion.assignedTo.ascended}
-            stats={champion.assignedTo}
-            details={defenderDetails(champion, isOfficer, undefined, false)}
-          />
+          <div key={champion.championId} data-flip-id={forPrint ? undefined : champion.championId}>
+            <ChampionCard
+              name={champion.championName}
+              imageUrl={champion.championImageUrl}
+              size="sm"
+              eager={forPrint}
+              onClick={isOfficer ? () => onDefenderClick(champion) : undefined}
+              awakened={champion.assignedTo.awakened}
+              ascended={champion.assignedTo.ascended}
+              stats={champion.assignedTo}
+              details={defenderDetails(champion, isOfficer, undefined, false)}
+            />
+          </div>
         ))}
         {Array.from({ length: Math.max(0, member.cap - member.assigned) }).map((_, index) =>
           onEmptySlotClick ? (

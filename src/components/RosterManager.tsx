@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import RosterImport from "./RosterImport";
 import ChampionCard from "./ChampionCard";
 import ChampionPicker, { parseOptionalInt } from "./ChampionPicker";
 import StarRating from "./StarRating";
+import { ROSTER_FX, crumpleIntoTrash, isShowing, useFlipChildren } from "@/lib/roster-fx";
 
 type RosterEntry = {
   id: string;
@@ -36,6 +37,7 @@ export default function RosterManager({
   const [editing, setEditing] = useState<RosterEntry | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const router = useRouter();
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const ownedIds = useMemo(() => new Set(roster.map((r) => r.championId)), [roster]);
   const available = useMemo(
@@ -112,6 +114,7 @@ export default function RosterManager({
       }),
     [roster]
   );
+  useFlipChildren(gridRef, sortedRoster);
 
   return (
     <div className="space-y-10">
@@ -152,23 +155,24 @@ export default function RosterManager({
             You haven't added any champions yet — pick one above to get started.
           </div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+          <div ref={gridRef} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
             {sortedRoster.map((entry) => (
-              <ChampionCard
-                key={entry.id}
-                name={entry.championName}
-                imageUrl={entry.championImageUrl}
-                size="sm"
-                onClick={() => setEditing(entry)}
-                awakened={entry.awakened}
-                ascended={entry.ascended}
-                stats={entry}
-                details={
-                  <div className="stat text-[10px] text-parchment-dim truncate">
-                    {entry.rating != null ? `${entry.rating.toLocaleString()} PI` : "PI —"}
-                  </div>
-                }
-              />
+              <div key={entry.id} data-flip-id={entry.id} data-roster-entry={entry.id} data-roster-champion={entry.championId}>
+                <ChampionCard
+                  name={entry.championName}
+                  imageUrl={entry.championImageUrl}
+                  size="sm"
+                  onClick={() => setEditing(entry)}
+                  awakened={entry.awakened}
+                  ascended={entry.ascended}
+                  stats={entry}
+                  details={
+                    <div className="stat text-[10px] text-parchment-dim truncate">
+                      {entry.rating != null ? `${entry.rating.toLocaleString()} PI` : "PI —"}
+                    </div>
+                  }
+                />
+              </div>
             ))}
           </div>
         )}
@@ -206,6 +210,8 @@ export function EditChampionModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   async function save() {
     const rankValue = parseOptionalInt(rank, 1, 6);
@@ -227,6 +233,17 @@ export function EditChampionModal({
 
   async function remove() {
     setRemoving(true);
+    // Crumple the card in the roster grid when it's on screen, otherwise this popup.
+    const gridCard = document.querySelector<HTMLElement>(`[data-roster-entry="${CSS.escape(entry.id)}"]`);
+    const source = gridCard && isShowing(gridCard) ? gridCard : panelRef.current;
+    if (ROSTER_FX && source) {
+      void crumpleIntoTrash(source);
+      onClose();
+      await onRemove(entry.id);
+      // If the removal failed the card is still in the roster, so bring it back.
+      if (gridCard?.isConnected) gridCard.style.visibility = "";
+      return;
+    }
     await onRemove(entry.id);
     setRemoving(false);
     onClose();
@@ -237,7 +254,48 @@ export function EditChampionModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onClick={onClose}
     >
-      <div className="panel w-full max-w-sm max-h-[90dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      {confirmingRemove && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setConfirmingRemove(false);
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-labelledby="remove-champion-title"
+            className="panel w-full max-w-xs p-5 border-crimson/50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="grid place-items-center h-10 w-10 shrink-0 rounded-full bg-crimson/15 text-crimson-bright">
+                <Trash2 size={18} />
+              </span>
+              <h4 id="remove-champion-title" className="font-display text-lg tracking-wide text-parchment">
+                Remove {entry.championName}?
+              </h4>
+            </div>
+            <p className="text-sm text-parchment-dim mb-4">This takes the champion off the roster. You can add it again later.</p>
+            <div className="flex gap-2">
+              <button className="btn-ghost flex-1" onClick={() => setConfirmingRemove(false)} autoFocus>
+                Cancel
+              </button>
+              <button
+                className="btn-danger flex-1"
+                disabled={removing}
+                onClick={() => {
+                  setConfirmingRemove(false);
+                  void remove();
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div ref={panelRef} className="panel w-full max-w-sm max-h-[90dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <ChampionCard
           name={entry.championName}
           imageUrl={entry.championImageUrl}
@@ -249,7 +307,7 @@ export function EditChampionModal({
           <div className="flex items-center justify-between">
             <h3 className="font-display text-xl tracking-wide text-parchment">{entry.championName}</h3>
             <button
-              onClick={remove}
+              onClick={() => setConfirmingRemove(true)}
               disabled={removing}
               className="text-crimson-bright hover:text-crimson p-1"
               aria-label="Remove from roster"

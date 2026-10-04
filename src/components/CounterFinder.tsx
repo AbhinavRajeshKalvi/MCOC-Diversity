@@ -314,8 +314,9 @@ export default function CounterFinder({
                   : "Officers haven't listed counters for this defender yet."}
               </p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {shownCounters.map((counter) => {
+              // Keyed by defender so the cards cascade in again for each new defender.
+              <div key={defenderId} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {shownCounters.map((counter, index) => {
                   const champion = championsById.get(counter.counterId)!;
                   const group = allCounters.filter((c) => c.strength === counter.strength);
                   const groupIndex = group.findIndex((c) => c.id === counter.id);
@@ -323,6 +324,7 @@ export default function CounterFinder({
                     <CounterPickCard
                       key={counter.id}
                       pick={allCounters.indexOf(counter) + 1}
+                      index={index}
                       counter={counter}
                       champion={champion}
                       profile={profilesById.get(champion.id) ?? null}
@@ -492,8 +494,12 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
+// Set to false to stop counter cards cascading in and the #1 pick shimmering.
+const COUNTER_FX = true;
+
 function CounterPickCard({
   pick,
+  index,
   counter,
   champion,
   profile,
@@ -507,6 +513,8 @@ function CounterPickCard({
   onRemove
 }: {
   pick: number;
+  /** Position in the shown list, for the cascade delay. */
+  index: number;
   counter: Counter;
   champion: CounterChampion;
   profile: CounterProfile | null;
@@ -520,7 +528,10 @@ function CounterPickCard({
   onRemove: () => void;
 }) {
   return (
-    <article className="panel flex flex-col p-4">
+    <article
+      className={`panel flex flex-col p-4 ${COUNTER_FX ? `fx-cascade ${pick === 1 ? "fx-shimmer" : ""}` : ""}`}
+      style={COUNTER_FX ? { animationDelay: `${Math.min(index, 12) * 70}ms` } : undefined}
+    >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 min-w-0">
           <Swords size={16} className="shrink-0 text-teal-bright" aria-hidden />

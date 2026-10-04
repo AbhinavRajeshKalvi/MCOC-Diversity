@@ -5,6 +5,7 @@ import { Crown, Gem, Link2, Plus, Search, Shield, Trash2 } from "lucide-react";
 import ChampionCard from "./ChampionCard";
 import ChampionPicker from "./ChampionPicker";
 import { EditChampionModal } from "./RosterManager";
+import { useFlipChildren } from "@/lib/roster-fx";
 import { isLeaderOrAbove, type Role } from "@/lib/roles";
 
 type Viewer = { userId: string; role: Role };
@@ -457,6 +458,8 @@ function MemberRosterSection({ users, champions }: { users: User[]; champions: C
       ),
     [roster]
   );
+  const rosterGridRef = useRef<HTMLDivElement>(null);
+  useFlipChildren(rosterGridRef, sortedRoster);
 
   async function loadRoster(userId: string) {
     const res = await fetch(`/api/roster?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
@@ -537,7 +540,6 @@ function MemberRosterSection({ users, champions }: { users: User[]; champions: C
   async function removeEntry(id: string) {
     if (!member) return;
     const name = roster?.find((entry) => entry.id === id)?.championName ?? "this champion";
-    if (!window.confirm(`Remove ${name} from ${member.displayName}'s roster?`)) return;
     setError(null);
     setNotice(null);
     const res = await fetch(`/api/roster/${id}`, { method: "DELETE" });
@@ -589,23 +591,27 @@ function MemberRosterSection({ users, champions }: { users: User[]; champions: C
               {roster.length === 0 ? (
                 <p className="text-sm text-parchment-faint">{member.displayName} has no champions yet.</p>
               ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-[28rem] overflow-y-auto pr-1">
+                <div
+                  ref={rosterGridRef}
+                  className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-[28rem] overflow-y-auto pr-1"
+                >
                   {sortedRoster.map((entry) => (
-                    <ChampionCard
-                      key={entry.id}
-                      name={entry.championName}
-                      imageUrl={entry.championImageUrl}
-                      size="sm"
-                      onClick={() => setEditing(entry)}
-                      awakened={entry.awakened}
-                      ascended={entry.ascended}
-                      stats={entry}
-                      details={
-                        <div className="stat text-[10px] text-parchment-dim truncate">
-                          {entry.rating != null ? `${entry.rating.toLocaleString()} PI` : "PI —"}
-                        </div>
-                      }
-                    />
+                    <div key={entry.id} data-flip-id={entry.id} data-roster-entry={entry.id} data-roster-champion={entry.championId}>
+                      <ChampionCard
+                        name={entry.championName}
+                        imageUrl={entry.championImageUrl}
+                        size="sm"
+                        onClick={() => setEditing(entry)}
+                        awakened={entry.awakened}
+                        ascended={entry.ascended}
+                        stats={entry}
+                        details={
+                          <div className="stat text-[10px] text-parchment-dim truncate">
+                            {entry.rating != null ? `${entry.rating.toLocaleString()} PI` : "PI —"}
+                          </div>
+                        }
+                      />
+                    </div>
                   ))}
                 </div>
               )}

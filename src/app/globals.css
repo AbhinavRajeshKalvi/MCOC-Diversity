@@ -146,3 +146,129 @@
   0% { transform: translateX(-100%); }
   100% { transform: translateX(300%); }
 }
+
+/* Attack map: plays when a player is put on a path or node (ASSIGN_ANIMATION in AttackMap.tsx).
+   A gold line sweeps up the path, each node lights and pops in turn, then the
+   name drops onto the path button with a small burst. */
+.attack-path-sweep {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: attack-path-sweep 520ms ease-out forwards, attack-fade-out 500ms ease-in 900ms forwards;
+}
+.attack-node-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: attack-node-pop 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.attack-node-light {
+  animation: attack-node-light 220ms ease-out both;
+}
+.attack-node-light-text {
+  animation: attack-node-light-text 220ms ease-out both;
+}
+.attack-node-flash {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: attack-node-flash 650ms ease-out both;
+}
+.attack-name-drop {
+  animation: attack-name-drop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.attack-burst {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: attack-burst 700ms ease-out both;
+}
+@keyframes attack-path-sweep {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes attack-fade-out {
+  to { opacity: 0; }
+}
+@keyframes attack-node-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+@keyframes attack-node-light {
+  from { fill: #20232c; }
+}
+@keyframes attack-node-light-text {
+  from { fill: #eef0f7; }
+}
+@keyframes attack-node-flash {
+  0% { opacity: 0.9; transform: scale(0.8); }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+@keyframes attack-name-drop {
+  0% { opacity: 0; transform: translateY(-16px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes attack-burst {
+  0% { opacity: 0.9; transform: scale(0.85); }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+
+/* Small page animations (cross-fades, counter cascade, login). Each is only
+   applied by a component when its FX flag is on. */
+.fx-fade-in {
+  animation: fx-fade-in 280ms ease-out both;
+}
+@keyframes fx-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { transform: none; }
+}
+/* Counter cards drop in one after another (delay set inline). */
+.fx-cascade {
+  animation: fx-cascade 460ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes fx-cascade {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { transform: none; }
+}
+/* A gold glint that sweeps across the #1 counter once it has landed. */
+.fx-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.fx-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% -60%;
+  width: 45%;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(246, 200, 97, 0.32), rgba(255, 255, 255, 0.22), transparent);
+  transform: skewX(-18deg);
+  animation: fx-shimmer 1100ms ease-in-out 520ms both;
+}
+@keyframes fx-shimmer {
+  from { left: -60%; }
+  to { left: 130%; }
+}
+/* Login: the logo stamps down with a brass glint, then the rest rises in. */
+.fx-logo-stamp {
+  position: relative;
+  overflow: hidden;
+  animation: fx-logo-stamp 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.fx-logo-stamp::after {
+  content: "";
+  position: absolute;
+  inset: -30% auto -30% -80%;
+  width: 50%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  transform: skewX(-20deg);
+  animation: fx-shimmer 700ms ease-in-out 560ms both;
+}
+@keyframes fx-logo-stamp {
+  0% { opacity: 0; transform: scale(2.6) rotate(-14deg); }
+  60% { opacity: 1; transform: scale(0.9) rotate(3deg); }
+  100% { opacity: 1; transform: none; }
+}
+.fx-rise {
+  animation: fx-rise 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes fx-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { transform: none; }
+}
