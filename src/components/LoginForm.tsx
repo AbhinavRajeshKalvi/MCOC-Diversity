@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -14,17 +15,26 @@ export default function LoginForm() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    setLoading(false);
+    let res: Response;
+    let data: { error?: string; mustChangePassword?: boolean };
+    try {
+      res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      data = await res.json();
+    } catch {
+      setLoading(false);
+      setError("Couldn't reach the server. Try again.");
+      return;
+    }
     if (!res.ok) {
+      setLoading(false);
       setError(data.error ?? "Something went wrong.");
       return;
     }
+    // Leave the button in its loading state until the next page takes over.
     router.push(data.mustChangePassword ? "/account/password" : "/battlegroups");
     router.refresh();
   }
@@ -60,8 +70,8 @@ export default function LoginForm() {
         />
       </div>
       {error && <p className="text-sm text-crimson-bright">{error}</p>}
-      <button type="submit" disabled={loading} className="btn-primary w-full">
-        {loading ? "Signing in…" : "Sign in"}
+      <button type="submit" disabled={loading} aria-busy={loading} className="btn-primary w-full">
+        {loading ? <><Loader2 size={15} className="animate-spin" /> Signing in…</> : "Sign in"}
       </button>
     </form>
   );

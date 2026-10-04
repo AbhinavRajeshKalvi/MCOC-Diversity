@@ -1,6 +1,11 @@
 import LoginForm from "@/components/LoginForm";
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams
+}: {
+  searchParams: { passwordChanged?: string };
+}) {
+  const passwordChanged = searchParams.passwordChanged === "1";
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -19,6 +24,11 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="panel p-6">
+          {passwordChanged && (
+            <p className="text-sm text-teal-bright bg-ink-raised border border-ink-line rounded-sm p-3 mb-4">
+              Password changed. Sign in with your new password.
+            </p>
+          )}
           <LoginForm />
         </div>
         <p className="text-xs text-parchment-faint text-center mt-4">

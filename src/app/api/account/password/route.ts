@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, ObjectId } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import {
-  hashPassword,
-  verifyPassword,
-  signSession,
-  SESSION_COOKIE,
-  SESSION_MAX_AGE
-} from "@/lib/auth";
+import { hashPassword, verifyPassword, SESSION_COOKIE } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/api-handler";
 
 const schema = z.object({
@@ -43,14 +37,8 @@ export const POST = withErrorHandling("POST /api/account/password", async (req: 
     { $set: { passwordHash: newHash, mustChangePassword: false } }
   );
 
-  const token = await signSession({ ...session, mustChangePassword: false });
+  // End the session so the user signs in again with the new password.
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_MAX_AGE
-  });
+  res.cookies.set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
   return res;
 });

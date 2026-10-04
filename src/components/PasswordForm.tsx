@@ -33,7 +33,7 @@ export default function PasswordForm({ forced }: { forced: boolean }) {
     }
     setSuccess(true);
     setTimeout(() => {
-      router.push("/battlegroups");
+      router.push("/login?passwordChanged=1");
       router.refresh();
     }, 700);
   }
@@ -90,8 +90,8 @@ export default function PasswordForm({ forced }: { forced: boolean }) {
         />
       </div>
       {error && <p className="text-sm text-crimson-bright">{error}</p>}
-      {success && <p className="text-sm text-teal-bright">Password updated.</p>}
-      <button type="submit" disabled={loading} className="btn-primary w-full">
+      {success && <p className="text-sm text-teal-bright">Password updated. Signing you out…</p>}
+      <button type="submit" disabled={loading || success} className="btn-primary w-full">
         {loading ? "Saving…" : "Save password"}
       </button>
     </form>
