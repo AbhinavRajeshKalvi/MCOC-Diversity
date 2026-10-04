@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, Eraser, Plus, Printer, RefreshCw, Search, Shield, Sparkles, Trash2, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { AssignedDefender, BattlegroupBoard, ChampionEntry, MemberDefenderRow, RosterOwner } from "@/lib/diversity";
@@ -407,10 +408,6 @@ This discards any manual changes you made to the suggested plan. The current def
                         </div>
                         <div className="text-xs text-parchment-faint">defender slots</div>
                       </div>
-                      <div>
-                        <div className="stat text-2xl text-brass-bright leading-none">{board.priorityAssigned}</div>
-                        <div className="text-xs text-parchment-faint">priority</div>
-                      </div>
                     </div>
                   </div>
 
@@ -512,7 +509,7 @@ This discards any manual changes you made to the suggested plan. The current def
                 </div>
               </div>
               <p className="text-xs text-parchment-faint mt-3">
-                {board.priorityAssigned} priority defenders are selected first; medium defenders only fill remaining capacity.
+                Priority defenders are selected first; medium defenders only fill remaining capacity.
               </p>
             </section>
 
@@ -594,10 +591,6 @@ function CurrentDefenderDiversityView({ board }: { board: BattlegroupBoard }) {
               </div>
               <div className="text-xs text-parchment-faint">defender slots</div>
             </div>
-            <div>
-              <div className="stat text-2xl text-brass-bright leading-none">{board.currentPriorityAssigned}</div>
-              <div className="text-xs text-parchment-faint">priority</div>
-            </div>
           </div>
         </div>
 
@@ -619,41 +612,44 @@ function CurrentDefenderDiversityView({ board }: { board: BattlegroupBoard }) {
         )}
       </section>
 
-      <div className="print-only-document">
-        <h1 className="print-title">Battlegroup {board.battlegroup} — Current Defender Diversity</h1>
-        <p className="print-subtitle">Current persisted defender assignments</p>
-
-        {sortByDiversityRating(board.currentDefenders).map((member) => (
-          <section key={member.userId} className="print-member">
-            <div className="print-member-header">
-              <span>
-                {member.displayName} · {diversityRating(member).toLocaleString()} PI
-              </span>
-              <span>{member.assigned}/{member.cap}</span>
+      <PrintPortal>
+        <div className="print-only-document">
+          <div className="flex items-end justify-between gap-4 mb-5">
+            <div>
+              <h1 className="font-display text-2xl tracking-wide text-parchment">
+                Battlegroup {board.battlegroup} · Current Defender Diversity
+              </h1>
+              <p className="text-xs text-parchment-faint mt-1">
+                {board.currentUniqueChampionsAssigned} unique defenders
+              </p>
             </div>
-            {member.defenders.length === 0 ? (
-              <div className="print-empty">No defenders assigned</div>
-            ) : (
-              <div className="print-defenders">
-                {member.defenders.map((defender) => (
-                  <div key={defender.championId} className="print-defender">
-                    <span>{defender.championName}</span>
-                    <span>
-                      {defender.assignedTo.rating != null ? `${defender.assignedTo.rating.toLocaleString()} PI` : "PI —"}
-                    </span>
-                  </div>
-                ))}
+            <div className="text-right">
+              <div className="stat text-2xl text-brass-bright leading-none">
+                {board.currentUniqueChampionsAssigned}/{board.maxDefenders}
               </div>
-            )}
-          </section>
-        ))}
+              <div className="text-xs text-parchment-faint">defender slots</div>
+            </div>
+          </div>
 
-        <div className="print-summary">
-          <strong>{board.currentUniqueChampionsAssigned} unique defenders</strong> · {board.currentPriorityAssigned} priority · {board.currentMediumAssigned} medium
+          <div className="space-y-3">
+            {sortByDiversityRating(board.currentDefenders).map((member) => (
+              <div key={member.userId} className="print-member">
+                <MemberDefenderRowView member={member} onDefenderClick={() => undefined} forPrint />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      </PrintPortal>
     </>
   );
+}
+
+// The print copy is rendered straight into <body> so print CSS can hide the
+// rest of the app with display: none instead of leaving blank pages behind.
+function PrintPortal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted ? createPortal(children, document.body) : null;
 }
 
 function AdditionalDefendersSection({
@@ -765,7 +761,8 @@ function MemberDefenderRowView({
   isOfficer,
   onDefenderClick,
   onEmptySlotClick,
-  onClear
+  onClear,
+  forPrint = false
 }: {
   member: MemberDefenderRow;
   isOfficer?: boolean;
@@ -774,9 +771,14 @@ function MemberDefenderRowView({
   onEmptySlotClick?: () => void;
   /** Officers: remove all of this member's defenders. */
   onClear?: () => void;
+  /** Print copy: always laid out (no off-screen skipping), images loaded up front. */
+  forPrint?: boolean;
 }) {
   return (
-    <div className="rounded-md border border-ink-line bg-ink-raised/30 overflow-hidden" style={OFFSCREEN_SKIP}>
+    <div
+      className="rounded-md border border-ink-line bg-ink-raised/30 overflow-hidden"
+      style={forPrint ? undefined : OFFSCREEN_SKIP}
+    >
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-ink-line/70">
         <div className="flex min-w-0 items-baseline gap-2">
           <div className="text-sm font-medium text-parchment truncate">{member.displayName}</div>
@@ -804,18 +806,19 @@ function MemberDefenderRowView({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 p-2.5">
+      <div className={`grid gap-2 p-2.5 ${forPrint ? "grid-cols-5" : "grid-cols-3 sm:grid-cols-5"}`}>
         {member.defenders.map((champion) => (
           <ChampionCard
             key={champion.championId}
             name={champion.championName}
             imageUrl={champion.championImageUrl}
             size="sm"
+            eager={forPrint}
             onClick={isOfficer ? () => onDefenderClick(champion) : undefined}
             awakened={champion.assignedTo.awakened}
             ascended={champion.assignedTo.ascended}
             stats={champion.assignedTo}
-            details={defenderDetails(champion, isOfficer)}
+            details={defenderDetails(champion, isOfficer, undefined, false)}
           />
         ))}
         {Array.from({ length: Math.max(0, member.cap - member.assigned) }).map((_, index) =>
@@ -851,12 +854,15 @@ function piText(rating: number | null | undefined) {
 }
 
 // Owner and PI sit under the card; stars/rank/ascension/sig are in the card's stat bar.
-function defenderDetails(c: AssignedDefender, clickable = false, actionLabel = "Click to reassign") {
+// A member's own defender row leaves the owner out, since their name heads the row.
+function defenderDetails(c: AssignedDefender, clickable = false, actionLabel = "Click to reassign", showOwner = true) {
   return (
     <>
-      <div className="text-brass-bright text-[10px] font-medium truncate" title={c.assignedTo.displayName}>
-        {c.assignedTo.displayName}
-      </div>
+      {showOwner && (
+        <div className="text-brass-bright text-[10px] font-medium truncate" title={c.assignedTo.displayName}>
+          {c.assignedTo.displayName}
+        </div>
+      )}
       <div className="stat text-[10px] text-parchment-dim truncate">{piText(c.assignedTo.rating)}</div>
       {clickable && <div className="text-[9px] text-brass-bright/80 truncate">{actionLabel}</div>}
     </>

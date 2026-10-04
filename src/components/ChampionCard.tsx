@@ -2,9 +2,7 @@
 
 import { useState, type CSSProperties } from "react";
 import Image from "next/image";
-import { ArrowUp, Star } from "lucide-react";
 import { getChampionArt } from "@/lib/champion-art";
-import { ascensionLabel } from "@/lib/ascension";
 
 export type ChampionCardStats = {
   stars?: number | null;
@@ -25,13 +23,8 @@ export function formatStatBar(stats: ChampionCardStats): string {
   return parts.join(" ");
 }
 
-// Badges and the stat bar scale with the card's own width (container query
-// units), clamped so they stay legible on tiny cards and never crowd them.
-const BADGE_STYLE: CSSProperties = {
-  width: "clamp(14px, 17cqw, 24px)",
-  height: "clamp(14px, 17cqw, 24px)",
-  top: "clamp(3px, 4cqw, 6px)"
-};
+// The stat bar scales with the card's own width (container query units),
+// clamped so it stays legible on tiny cards.
 const STAT_BAR_STYLE: CSSProperties = { fontSize: "clamp(8px, 10.5cqw, 12px)" };
 
 // Hosts Next.js may resize and cache (must match images.remotePatterns in
@@ -63,8 +56,7 @@ export default function ChampionCard({
   stats,
   showName = true,
   badge,
-  awakened,
-  ascended
+  eager = false
 }: {
   name: string;
   imageUrl?: string | null;
@@ -83,10 +75,12 @@ export default function ChampionCard({
   showName?: boolean;
   /** Small content pinned to the top-right corner (e.g. a checkmark or count). */
   badge?: React.ReactNode;
-  /** MCOC roster state indicators: ascended is top-left, awakened is top-right. */
+  /** Accepted for callers but no longer drawn on the card; the stat bar shows ascension and awakening. */
   awakened?: boolean | null;
   /** Ascension level: 0 = not ascended, 1-3 = level, null = unknown. */
   ascended?: number | null;
+  /** Load the image right away instead of lazily (needed for print copies that are never scrolled into view). */
+  eager?: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
   const art = getChampionArt(name);
@@ -137,6 +131,7 @@ export default function ChampionCard({
             alt={name}
             fill
             sizes={isBanner ? BANNER_SIZES : POSTER_SIZES}
+            loading={eager ? "eager" : "lazy"}
             onError={() => setImgError(true)}
             className={`object-cover object-top transition-transform duration-300 ${onClick ? "group-hover:scale-110" : ""}`}
           />
@@ -147,7 +142,7 @@ export default function ChampionCard({
             alt={name}
             width={200}
             height={isBanner ? 67 : 300}
-            loading="lazy"
+            loading={eager ? "eager" : "lazy"}
             decoding="async"
             onError={() => setImgError(true)}
             className={`absolute inset-0 w-full h-full object-cover object-top transition-transform duration-300 ${
@@ -171,40 +166,6 @@ export default function ChampionCard({
         )}
 
         {isBanner && <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/0 to-black/0" />}
-
-        {ascended !== undefined && (
-          <div
-            className={`absolute z-10 flex items-center justify-center rounded-full border ${
-              ascended != null && ascended > 0
-                ? "border-violet-300/80 bg-violet-950/90 text-violet-200"
-                : ascended === 0
-                  ? "border-white/20 bg-black/70 text-white/35"
-                  : "border-white/20 bg-black/70 text-white/45"
-            }`}
-            style={{ ...BADGE_STYLE, left: BADGE_STYLE.top }}
-            title={ascensionLabel(ascended)}
-            aria-label={ascensionLabel(ascended)}
-          >
-            <ArrowUp className="h-[60%] w-[60%]" strokeWidth={2.5} />
-          </div>
-        )}
-
-        {awakened !== undefined && (
-          <div
-            className={`absolute z-10 flex items-center justify-center rounded-full border ${
-              awakened === true
-                ? "border-brass-bright/80 bg-black/80 text-brass-bright"
-                : awakened === false
-                  ? "border-white/20 bg-black/70 text-white/35"
-                  : "border-white/20 bg-black/70 text-white/45"
-            }`}
-            style={{ ...BADGE_STYLE, right: BADGE_STYLE.top }}
-            title={awakened === true ? "Awakened" : awakened === false ? "Not awakened" : "Awakening unknown"}
-            aria-label={awakened === true ? "Awakened" : awakened === false ? "Not awakened" : "Awakening unknown"}
-          >
-            <Star className="h-[60%] w-[60%]" strokeWidth={2.5} fill={awakened === true ? "currentColor" : "none"} />
-          </div>
-        )}
 
         {badge && <div className="absolute top-1.5 right-1.5 z-10">{badge}</div>}
 
