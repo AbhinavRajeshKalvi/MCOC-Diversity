@@ -1,6 +1,6 @@
 import type { Db, MongoServerError } from "mongodb";
 import { ObjectId } from "./db";
-import { UPPER_NODES, isPathSlot, nodeSlot, type AttackBoard, type AttackMember, type AttackSlot } from "./attack-map";
+import { PATHS, isPathSlot, pathSlot, type AttackBoard, type AttackMember, type AttackSlot } from "./attack-map";
 
 export const ATTACK_ASSIGNMENTS = "attackAssignments";
 
@@ -114,13 +114,13 @@ export async function setAttackSlot(
     }
   }
 
-  // A member holds at most one spot on the upper islands, so taking a new one
-  // gives up the old one.
-  if (!isPathSlot(slot)) {
+  // A member runs at most one attack path, so putting them on a new path takes
+  // them off their old one. Upper-island spots have no limit.
+  if (isPathSlot(slot)) {
     await collection.deleteMany({
       battlegroup,
       userId: target,
-      slot: { $in: UPPER_NODES.map(nodeSlot).filter((other) => other !== slot) }
+      slot: { $in: PATHS.map(pathSlot).filter((other) => other !== slot) }
     });
   }
   return { ok: true };

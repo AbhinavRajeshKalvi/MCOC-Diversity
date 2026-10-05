@@ -130,10 +130,11 @@ export default function AttackMap({
   }
 
   const holderOf = (slot: AttackSlot): AttackMember | undefined => board.assignments[slot];
-  const pathCounts = new Map<string, number>();
+  // The path each member runs, shown in the path dropdowns.
+  const pathOf = new Map<string, number>();
   for (const path of PATHS) {
     const holder = holderOf(pathSlot(path));
-    if (holder) pathCounts.set(holder.userId, (pathCounts.get(holder.userId) ?? 0) + 1);
+    if (holder) pathOf.set(holder.userId, path);
   }
   const withoutSpot = board.members.filter(
     (member) => !Object.values(board.assignments).some((holder) => holder?.userId === member.userId)
@@ -430,7 +431,9 @@ export default function AttackMap({
             <section className="panel p-4">
               <h2 className="font-display text-lg font-semibold mb-1">Attack paths</h2>
               <p className="text-xs text-parchment-faint mb-3">
-                {isOfficer ? "Pick who runs each path." : "Officers assign these paths."}
+                {isOfficer
+                  ? "Pick who runs each path. Each player runs one path, so picking someone moves them off their old one."
+                  : "Officers assign these paths."}
               </p>
               <ul className="space-y-1.5">
                 {PATHS.map((path) => {
@@ -453,8 +456,8 @@ export default function AttackMap({
                             value={holderOf(slot)?.userId ?? ""}
                             disabled={savingSlot !== null}
                             describe={(member) => {
-                              const count = pathCounts.get(member.userId) ?? 0;
-                              return count > 0 ? `${member.displayName} (${count})` : member.displayName;
+                              const current = pathOf.get(member.userId);
+                              return current && current !== path ? `${member.displayName} (Path ${current})` : member.displayName;
                             }}
                             onChange={(userId) => setSlot(slot, userId)}
                           />
@@ -470,7 +473,7 @@ export default function AttackMap({
               <h2 className="font-display text-lg font-semibold mb-1">Upper islands</h2>
               <p className="text-xs text-parchment-faint mb-3">
                 {canPickUpper
-                  ? "Take one open spot on any of these islands. Taking a new spot frees your old one."
+                  ? "Take any open spots on these islands. You can hold more than one."
                   : "Members of this battlegroup pick their own spots here."}
               </p>
               <div className="space-y-4">
