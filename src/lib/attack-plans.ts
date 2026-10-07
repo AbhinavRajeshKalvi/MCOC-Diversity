@@ -1,8 +1,13 @@
 import type { Db, MongoServerError } from "mongodb";
 import { ObjectId } from "./db";
 import { PATHS, isPathSlot, pathSlot, type AttackBoard, type AttackMember, type AttackSlot } from "./attack-map";
+import type { WarMode } from "./war-mode";
 
-export const ATTACK_ASSIGNMENTS = "attackAssignments";
+// Each war mode has its own map, so each keeps its own assignments.
+export const ATTACK_ASSIGNMENTS: Record<WarMode, string> = {
+  regular: "attackAssignments",
+  bigThings: "bigThingsAttackAssignments"
+};
 
 type AttackAssignmentDoc = {
   battlegroup: number;
@@ -25,10 +30,14 @@ async function loadMembers(db: Db, battlegroup: number): Promise<AttackMember[]>
  * The attack map for one battlegroup. Assignments held by someone who has
  * since left the battlegroup are treated as empty.
  */
-export async function loadAttackBoard(db: Db, battlegroup: 1 | 2 | 3): Promise<AttackBoard> {
+export async function loadAttackBoard(
+  db: Db,
+  battlegroup: 1 | 2 | 3,
+  mode: WarMode = "regular"
+): Promise<AttackBoard> {
   const [members, docs] = await Promise.all([
     loadMembers(db, battlegroup),
-    db.collection<AttackAssignmentDoc>(ATTACK_ASSIGNMENTS).find({ battlegroup }).toArray()
+    db.collection<AttackAssignmentDoc>(ATTACK_ASSIGNMENTS[mode]).find({ battlegroup }).toArray()
   ]);
   const byId = new Map(members.map((member) => [member.userId, member]));
   const assignments: AttackBoard["assignments"] = {};
@@ -53,12 +62,14 @@ function isDuplicateKey(err: unknown): boolean {
 export async function setAttackSlot(
   db: Db,
   {
+    mode,
     battlegroup,
     slot,
     userId,
     actorId,
     actorIsOfficer
   }: {
+    mode: WarMode;
     battlegroup: 1 | 2 | 3;
     slot: AttackSlot;
     userId: string | null;
@@ -66,7 +77,7 @@ export async function setAttackSlot(
     actorIsOfficer: boolean;
   }
 ): Promise<AttackEditResult> {
-  const collection = db.collection<AttackAssignmentDoc>(ATTACK_ASSIGNMENTS);
+  const collection = db.collection<AttackAssignmentDoc>(ATTACK_ASSIGNMENTS[mode]);
   const members = await loadMembers(db, battlegroup);
   const memberIds = members.map((member) => new ObjectId(member.userId));
   const actor = new ObjectId(actorId);

@@ -3,14 +3,11 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import SlidingTabs from "./SlidingTabs";
+import type { WarMode } from "@/lib/war-mode";
 import {
-  MAP_HEIGHT,
-  MAP_ISLANDS,
-  MAP_NODES,
-  MAP_WIDTH,
+  MAP_LAYOUTS,
   NODE_RADIUS,
   PATHS,
-  UPPER_ISLANDS,
   nodeSlot,
   pathLabelPosition,
   pathNodes,
@@ -37,9 +34,8 @@ const C = {
   crimsonBright: "#F05A72"
 };
 
-const NODE_POSITION = new Map(MAP_NODES.map((node) => [node.node, node]));
-// Upper nodes whose name label goes above the node so it doesn't collide with neighbours.
-const LABEL_ABOVE = new Set([48, 49, 50]);
+// Node number to its spot on the regular map, for drawing the path highlights.
+const NODE_POSITION = new Map(MAP_LAYOUTS.regular.nodes.map((node) => [node.node, node]));
 
 // Set to false to turn off the animation that plays when someone is put on a
 // path or node (styles are the attack-* classes in globals.css).
@@ -54,11 +50,14 @@ function shortName(name: string, max = 9): string {
 }
 
 export default function AttackMap({
+  mode = "regular",
   boards: initialBoards,
   viewerId,
   isOfficer,
   initialBattlegroup
 }: {
+  /** Which war mode's map to show; edits are saved to the same mode. */
+  mode?: WarMode;
   boards: AttackBoard[];
   viewerId: string;
   isOfficer: boolean;
@@ -81,6 +80,7 @@ export default function AttackMap({
     return () => window.clearTimeout(timeout);
   }, [equipped]);
 
+  const layout = MAP_LAYOUTS[mode];
   const board = boards[active]!;
   const viewerInBoard = board.members.some((member) => member.userId === viewerId);
   const canPickUpper = isOfficer || viewerInBoard;
@@ -110,7 +110,7 @@ export default function AttackMap({
       const res = await fetch("/api/attack-assignments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ battlegroup: board.battlegroup, slot, userId })
+        body: JSON.stringify({ mode, battlegroup: board.battlegroup, slot, userId })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -166,8 +166,8 @@ export default function AttackMap({
         <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] gap-6 items-start">
           <div className="panel p-3 sm:p-5">
             <svg
-              viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
-              className="w-full max-w-[640px] mx-auto block select-none"
+              viewBox={`0 0 ${layout.width} ${layout.height}`}
+              className={`w-full ${layout.hasPaths ? "max-w-[640px]" : "max-w-[520px]"} mx-auto block select-none`}
               role="group"
               aria-label={`Battlegroup ${board.battlegroup} attack map`}
             >
@@ -177,8 +177,21 @@ export default function AttackMap({
                 </filter>
               </defs>
 
-              {MAP_ISLANDS.map((island, i) => (
+              {layout.islands.map((island, i) => (
                 <polygon key={i} points={island.points} fill={island.boss ? "#2A1A22" : C.ink} fillOpacity={0.75} />
+              ))}
+
+              {layout.endBars.map(([x, y], i) => (
+                <line
+                  key={`end-${i}`}
+                  x1={x}
+                  y1={y - 24}
+                  x2={x}
+                  y2={y + 24}
+                  stroke={C.crimsonBright}
+                  strokeWidth={5}
+                  strokeLinecap="round"
+                />
               ))}
 
               {selected?.startsWith("path-") &&
@@ -199,7 +212,7 @@ export default function AttackMap({
                   );
                 })()}
 
-              {MAP_ISLANDS.map((island, i) => (
+              {layout.islands.map((island, i) => (
                 <g key={i}>
                   {island.edges.map(([[x1, y1], [x2, y2]], j) => (
                     <line
@@ -248,7 +261,7 @@ export default function AttackMap({
                   );
                 })()}
 
-              {MAP_NODES.map((node) => {
+              {layout.nodes.map((node) => {
                 const holder = holderOf(node.slot);
                 // How far up the path this node is, for the order it lights in; -1 when not animating.
                 const sweepStep =
@@ -261,7 +274,7 @@ export default function AttackMap({
                 const mine = holder?.userId === viewerId;
                 const isSelected = selected === node.slot;
                 const fill = mine ? C.teal : holder ? C.brass : C.raised;
-                const isBoss = node.node === 50;
+                const isBoss = node.node === layout.bossNode;
                 const label = !node.slot.startsWith("path-") && holder ? shortName(holder.displayName) : null;
                 return (
                   <g
@@ -325,7 +338,7 @@ export default function AttackMap({
                     </g>
                     {label &&
                       (() => {
-                        const y = LABEL_ABOVE.has(node.node) ? node.y - NODE_RADIUS - 13 : node.y + NODE_RADIUS + 13;
+                        const y = layout.labelAbove.has(node.node) ? node.y - NODE_RADIUS - 13 : node.y + NODE_RADIUS + 13;
                         const width = label.length * 7.5 + 12;
                         return (
                           <g
@@ -352,7 +365,7 @@ export default function AttackMap({
                 );
               })}
 
-              {PATHS.map((path) => {
+              {layout.hasPaths && PATHS.map((path) => {
                 const { x, y } = pathLabelPosition(path);
                 const slot = pathSlot(path);
                 const holder = holderOf(slot);
@@ -428,56 +441,58 @@ export default function AttackMap({
           </div>
 
           <div className="space-y-6 min-w-0">
-            <section className="panel p-4">
-              <h2 className="font-display text-lg font-semibold mb-1">Attack paths</h2>
-              <p className="text-xs text-parchment-faint mb-3">
-                {isOfficer
-                  ? "Pick who runs each path. Each player runs one path, so picking someone moves them off their old one."
-                  : "Officers assign these paths."}
-              </p>
-              <ul className="space-y-1.5">
-                {PATHS.map((path) => {
-                  const slot = pathSlot(path);
-                  return (
-                    <SlotRow
-                      key={slot}
-                      slot={slot}
-                      title={`Path ${path}`}
-                      subtitle={`Nodes ${pathNodes(path).join(" · ")}`}
-                      holder={holderOf(slot)}
-                      selected={selected === slot}
-                      saving={savingSlot === slot}
-                      viewerId={viewerId}
-                      onSelect={() => setSelected(slot)}
-                      control={
-                        isOfficer ? (
-                          <MemberSelect
-                            members={board.members}
-                            value={holderOf(slot)?.userId ?? ""}
-                            disabled={savingSlot !== null}
-                            describe={(member) => {
-                              const current = pathOf.get(member.userId);
-                              return current && current !== path ? `${member.displayName} (Path ${current})` : member.displayName;
-                            }}
-                            onChange={(userId) => setSlot(slot, userId)}
-                          />
-                        ) : null
-                      }
-                    />
-                  );
-                })}
-              </ul>
-            </section>
+            {layout.hasPaths && (
+              <section className="panel p-4">
+                <h2 className="font-display text-lg font-semibold mb-1">Attack paths</h2>
+                <p className="text-xs text-parchment-faint mb-3">
+                  {isOfficer
+                    ? "Pick who runs each path. Each player runs one path, so picking someone moves them off their old one."
+                    : "Officers assign these paths."}
+                </p>
+                <ul className="space-y-1.5">
+                  {PATHS.map((path) => {
+                    const slot = pathSlot(path);
+                    return (
+                      <SlotRow
+                        key={slot}
+                        slot={slot}
+                        title={`Path ${path}`}
+                        subtitle={`Nodes ${pathNodes(path).join(" · ")}`}
+                        holder={holderOf(slot)}
+                        selected={selected === slot}
+                        saving={savingSlot === slot}
+                        viewerId={viewerId}
+                        onSelect={() => setSelected(slot)}
+                        control={
+                          isOfficer ? (
+                            <MemberSelect
+                              members={board.members}
+                              value={holderOf(slot)?.userId ?? ""}
+                              disabled={savingSlot !== null}
+                              describe={(member) => {
+                                const current = pathOf.get(member.userId);
+                                return current && current !== path ? `${member.displayName} (Path ${current})` : member.displayName;
+                              }}
+                              onChange={(userId) => setSlot(slot, userId)}
+                            />
+                          ) : null
+                        }
+                      />
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
 
             <section className="panel p-4">
-              <h2 className="font-display text-lg font-semibold mb-1">Upper islands</h2>
+              <h2 className="font-display text-lg font-semibold mb-1">{layout.pickTitle}</h2>
               <p className="text-xs text-parchment-faint mb-3">
                 {canPickUpper
                   ? "Take any open spots on these islands. You can hold more than one."
                   : "Members of this battlegroup pick their own spots here."}
               </p>
               <div className="space-y-4">
-                {UPPER_ISLANDS.map((island) => (
+                {layout.pickIslands.map((island) => (
                   <div key={island.name}>
                     <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-parchment-dim">
                       {island.name}
@@ -514,7 +529,7 @@ export default function AttackMap({
                             key={slot}
                             slot={slot}
                             title={`Node ${node}`}
-                            subtitle={node === 50 ? "Boss" : undefined}
+                            subtitle={node === layout.bossNode ? "Boss" : undefined}
                             holder={holder}
                             selected={selected === slot}
                             saving={savingSlot === slot}

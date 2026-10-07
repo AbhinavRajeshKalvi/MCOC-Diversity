@@ -43,6 +43,8 @@ export type DefenderAssignment = CurrentDefenderAssignment;
 export type BattlegroupBoard = {
   battlegroup: number;
   memberCount: number;
+  /** Defenders each member places: 5 in regular wars, 1 in Big Things. */
+  defendersPerMember: number;
   maxDefenders: number;
   suggestedDefenders: MemberDefenderRow[];
   currentDefenders: MemberDefenderRow[];
@@ -504,6 +506,7 @@ export function computeBattlegroupBoard(
   return {
     battlegroup,
     memberCount: members.length,
+    defendersPerMember: maxDefendersPerMember,
     maxDefenders: members.length * maxDefendersPerMember,
     suggestedDefenders,
     currentDefenders,

@@ -2,13 +2,15 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Eraser, Plus, Printer, RefreshCw, Search, Shield, Sparkles, Trash2, UserPlus, X } from "lucide-react";
+import { Check, Eraser, Loader2, Plus, Printer, RefreshCw, Search, Shield, Sparkles, Trash2, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { AssignedDefender, BattlegroupBoard, ChampionEntry, MemberDefenderRow, RosterOwner } from "@/lib/diversity";
 import { ascensionLabel } from "@/lib/ascension";
 import ChampionCard from "./ChampionCard";
 import SlidingTabs from "./SlidingTabs";
 import { dealIn, flyFromSnapshot, snapshotPositions, stamp } from "@/lib/board-fx";
+import type { WarMode } from "@/lib/war-mode";
+import { BIG_THINGS_NODES } from "@/lib/attack-map";
 
 type BattlegroupMember = {
   userId: string;
@@ -22,14 +24,30 @@ type AllianceUser = BattlegroupMember & {
 
 type BoardView = "suggested" | "current";
 
+/** Members per Battlegroup. */
+const MAX_MEMBERS = 10;
+
+// Big Things rows hold a single defender, so they sit side by side as tiles
+// instead of one full-width row each.
+function rowsLayout(cap: number, forPrint = false) {
+  if (cap > 1) return forPrint ? "space-y-3" : "space-y-4";
+  return forPrint ? "grid grid-cols-5 gap-3" : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3";
+}
+
 export default function BattlegroupBoards({
+  mode = "regular",
   boards,
+  defenderNodes = {},
   isOfficer,
   allUsers = [],
   initialBattlegroup,
   initialView = "suggested"
 }: {
+  /** Which war mode's plans these boards show; edits are saved to the same mode. */
+  mode?: WarMode;
   boards: BattlegroupBoard[];
+  /** Big Things: battlegroup to member id to the node their defender sits on. */
+  defenderNodes?: Record<number, Record<string, number>>;
   isOfficer?: boolean;
   allUsers?: AllianceUser[];
   initialBattlegroup?: number;
@@ -70,11 +88,16 @@ export default function BattlegroupBoards({
     targetUserId?: string;
   } | null>(null);
   const [rosterMemberId, setRosterMemberId] = useState<string | null>(null);
+  const [nodesByBoard, setNodesByBoard] = useState(defenderNodes);
+  const [savingNodeFor, setSavingNodeFor] = useState<string | null>(null);
   // Member whose open defender slot was clicked: shows their roster minus their own defenders.
   const [fillMemberId, setFillMemberId] = useState<string | null>(null);
 
   const router = useRouter();
   const board = boards[active];
+  const cap = board.defendersPerMember;
+  // Node placement only exists in Big Things; null leaves rows unnumbered.
+  const nodes = mode === "bigThings" ? nodesByBoard[board.battlegroup] ?? {} : null;
 
   // Animations wait for the refreshed board to arrive from the server, then
   // play against the new cards. `before` holds where cards were for moves.
@@ -101,7 +124,7 @@ export default function BattlegroupBoards({
       dealIn(rows, "flip");
       stamp(rows ?? fxRef.current, "Published", 250);
     }
-  }, [boards, board.battlegroup]);
+  }, [boards, nodesByBoard, board.battlegroup]);
 
   // Keep the open Battlegroup and tab in the URL so a page refresh returns to them.
   function rememberLocation(battlegroup: number, nextView: BoardView) {
@@ -141,6 +164,38 @@ export default function BattlegroupBoards({
     }
   }
 
+  /** Big Things: puts a member's defender on a node, or takes it off when node is null. */
+  async function assignNode(member: MemberDefenderRow, node: number | null) {
+    if (!isOfficer || !nodes) return;
+    const current = nodes[member.userId];
+    if (node === null && current === undefined) return;
+    setError(null);
+    setNotice(null);
+    setSavingNodeFor(member.userId);
+    try {
+      const res = await fetch("/api/defender-nodes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          battlegroup: board.battlegroup,
+          node: node ?? current,
+          userId: node === null ? null : member.userId
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Couldn't save that node.");
+        return;
+      }
+      queueMoveFx(null);
+      setNodesByBoard((all) => ({ ...all, [board.battlegroup]: data.nodes as Record<string, number> }));
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setSavingNodeFor(null);
+    }
+  }
+
   async function handleRemoveDefender(sourceMember: MemberDefenderRow, champion: AssignedDefender) {
     setError(null);
     setNotice(null);
@@ -151,6 +206,7 @@ export default function BattlegroupBoards({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "remove",
+        mode,
         battlegroup: board.battlegroup,
         championId: champion.championId,
         fromUserId: sourceMember.userId,
@@ -185,7 +241,7 @@ export default function BattlegroupBoards({
       const res = await fetch("/api/current-defender-diversity", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "publish-suggested", battlegroup: board.battlegroup })
+        body: JSON.stringify({ action: "publish-suggested", mode, battlegroup: board.battlegroup })
       });
       const data = await res.json();
 
@@ -209,7 +265,7 @@ export default function BattlegroupBoards({
   async function clearMemberDefenders(member: MemberDefenderRow) {
     if (!isOfficer) return;
     const confirmed = window.confirm(
-      `Clear all ${member.assigned} of ${member.displayName}'s defenders from the Battlegroup ${board.battlegroup} suggested plan?\n\nTheir roster is not changed.`
+      `Clear ${member.assigned === 1 ? `${member.displayName}'s defender` : `all ${member.assigned} of ${member.displayName}'s defenders`} from the Battlegroup ${board.battlegroup} suggested plan?\n\nTheir roster is not changed.`
     );
     if (!confirmed) return;
 
@@ -220,7 +276,7 @@ export default function BattlegroupBoards({
     const res = await fetch("/api/defender-assignments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "clear", battlegroup: board.battlegroup, userId: member.userId })
+      body: JSON.stringify({ action: "clear", mode, battlegroup: board.battlegroup, userId: member.userId })
     });
     const data = await res.json();
 
@@ -251,7 +307,7 @@ This discards any manual changes you made to the suggested plan. The current def
       const res = await fetch("/api/defender-assignments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "auto-suggest", battlegroup: board.battlegroup })
+        body: JSON.stringify({ action: "auto-suggest", mode, battlegroup: board.battlegroup })
       });
       const data = await res.json();
 
@@ -284,6 +340,7 @@ This discards any manual changes you made to the suggested plan. The current def
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "assign",
+        mode,
         battlegroup: board.battlegroup,
         championId: champion.championId,
         fromUserId: sourceMember?.userId ?? null,
@@ -431,8 +488,8 @@ This discards any manual changes you made to the suggested plan. The current def
                         <div>
                           <h2 className="font-display text-xl tracking-wide text-parchment">Suggested defenders</h2>
                           <p className="text-xs text-parchment-faint mt-1">
-                            Up to 5 defenders for each member. Your manual changes stay put; use Auto-suggest to rebuild the
-                            plan from the best defenders and highest PI.
+                            {cap === 1 ? "1 defender for each member" : `Up to ${cap} defenders for each member`}. Your manual
+                            changes stay put; use Auto-suggest to rebuild the plan from the best defenders and highest PI.
                           </p>
                         </div>
                         <div className="flex items-center gap-5 text-right">
@@ -445,11 +502,15 @@ This discards any manual changes you made to the suggested plan. The current def
                         </div>
                       </div>
 
-                      <div className="space-y-4" data-fx-rows>
-                        {sortByDiversityRating(board.suggestedDefenders).map((member) => (
+                      <div className={rowsLayout(cap)} data-fx-rows>
+                        {sortRows(board.suggestedDefenders, nodes).map((member) => (
                           <MemberDefenderRowView
                             key={member.userId}
                             member={member}
+                            node={nodes ? nodes[member.userId] ?? null : undefined}
+                            nodeHolders={nodes ? nodeHolders(board.suggestedDefenders, nodes) : undefined}
+                            nodeSaving={savingNodeFor === member.userId}
+                            onNodeChange={isOfficer && nodes ? (node) => assignNode(member, node) : undefined}
                             isOfficer={isOfficer}
                             onDefenderClick={(champion) => setReassigning({ sourceMember: member, champion })}
                             onEmptySlotClick={isOfficer ? () => setFillMemberId(member.userId) : undefined}
@@ -468,7 +529,7 @@ This discards any manual changes you made to the suggested plan. The current def
                     />
                   </>
                 ) : (
-                  <CurrentDefenderDiversityView board={board} />
+                  <CurrentDefenderDiversityView board={board} nodes={nodes} />
                 )}
               </div>
             </div>
@@ -479,9 +540,9 @@ This discards any manual changes you made to the suggested plan. The current def
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-3">
                     <div>
                       <h2 className="font-display text-xl tracking-wide text-parchment">Battlegroup members</h2>
-                      <p className="text-xs text-parchment-faint mt-1">{members.length}/10 members</p>
+                      <p className="text-xs text-parchment-faint mt-1">{members.length}/{MAX_MEMBERS} members</p>
                     </div>
-                    <span className="stat text-sm text-brass-bright">{members.length * 5}/50</span>
+                    <span className="stat text-sm text-brass-bright">{members.length * cap}/{MAX_MEMBERS * cap}</span>
                   </div>
 
                   <ul className="space-y-2.5">
@@ -502,7 +563,7 @@ This discards any manual changes you made to the suggested plan. The current def
                             >
                               {member.displayName}
                             </button>
-                            <div className="stat text-[11px] text-parchment-faint">{usage?.assigned ?? 0}/5 defenders</div>
+                            <div className="stat text-[11px] text-parchment-faint">{usage?.assigned ?? 0}/{cap} {cap === 1 ? "defender" : "defenders"}</div>
                           </div>
                           <button
                             type="button"
@@ -522,11 +583,11 @@ This discards any manual changes you made to the suggested plan. The current def
                   <button
                     type="button"
                     onClick={() => setShowAdd(true)}
-                    disabled={members.length >= 10 || availableUsers.length === 0}
+                    disabled={members.length >= MAX_MEMBERS || availableUsers.length === 0}
                     className="btn-ghost w-full mt-4"
                   >
                     <Plus size={15} />
-                    {members.length >= 10 ? "Battlegroup full" : "Add member"}
+                    {members.length >= MAX_MEMBERS ? "Battlegroup full" : "Add member"}
                   </button>
                 </section>
               )}
@@ -599,6 +660,7 @@ This discards any manual changes you made to the suggested plan. The current def
           key={`${reassigning.champion.championId}-${reassigning.targetUserId ?? ""}`}
           initialTargetUserId={reassigning.targetUserId}
           rows={board.suggestedDefenders}
+          cap={cap}
           sourceMember={reassigning.sourceMember}
           champion={reassigning.champion}
           onClose={() => setReassigning(null)}
@@ -610,7 +672,13 @@ This discards any manual changes you made to the suggested plan. The current def
   );
 }
 
-function CurrentDefenderDiversityView({ board }: { board: BattlegroupBoard }) {
+function CurrentDefenderDiversityView({
+  board,
+  nodes
+}: {
+  board: BattlegroupBoard;
+  nodes: Record<string, number> | null;
+}) {
   return (
     <>
       <section className="panel p-5 print:hidden">
@@ -636,11 +704,12 @@ function CurrentDefenderDiversityView({ board }: { board: BattlegroupBoard }) {
             No current defender assignments have been published for this Battlegroup yet.
           </div>
         ) : (
-          <div className="space-y-4" data-fx-rows>
-            {sortByDiversityRating(board.currentDefenders).map((member) => (
+          <div className={rowsLayout(board.defendersPerMember)} data-fx-rows>
+            {sortRows(board.currentDefenders, nodes).map((member) => (
               <MemberDefenderRowView
                 key={member.userId}
                 member={member}
+                node={nodes ? nodes[member.userId] ?? null : undefined}
                 isOfficer={false}
                 onDefenderClick={() => undefined}
               />
@@ -668,10 +737,15 @@ function CurrentDefenderDiversityView({ board }: { board: BattlegroupBoard }) {
             </div>
           </div>
 
-          <div className="space-y-3">
-            {sortByDiversityRating(board.currentDefenders).map((member) => (
+          <div className={rowsLayout(board.defendersPerMember, true)}>
+            {sortRows(board.currentDefenders, nodes).map((member) => (
               <div key={member.userId} className="print-member">
-                <MemberDefenderRowView member={member} onDefenderClick={() => undefined} forPrint />
+                <MemberDefenderRowView
+                  member={member}
+                  node={nodes ? nodes[member.userId] ?? null : undefined}
+                  onDefenderClick={() => undefined}
+                  forPrint
+                />
               </div>
             ))}
           </div>
@@ -794,8 +868,30 @@ function sortByDiversityRating(rows: MemberDefenderRow[]) {
   );
 }
 
+/** Big Things rows go in node order, members without a node last; otherwise by diversity rating. */
+function sortRows(rows: MemberDefenderRow[], nodes: Record<string, number> | null) {
+  const sorted = sortByDiversityRating(rows);
+  if (!nodes) return sorted;
+  const order = (row: MemberDefenderRow) => nodes[row.userId] ?? Number.POSITIVE_INFINITY;
+  return sorted.sort((a, b) => order(a) - order(b));
+}
+
+/** Node to the name of the member on it, for labelling the node picker. */
+function nodeHolders(rows: MemberDefenderRow[], nodes: Record<string, number>) {
+  const holders: Record<number, string> = {};
+  for (const row of rows) {
+    const node = nodes[row.userId];
+    if (node !== undefined) holders[node] = row.displayName;
+  }
+  return holders;
+}
+
 function MemberDefenderRowView({
   member,
+  node,
+  nodeHolders,
+  nodeSaving = false,
+  onNodeChange,
   isOfficer,
   onDefenderClick,
   onEmptySlotClick,
@@ -803,6 +899,13 @@ function MemberDefenderRowView({
   forPrint = false
 }: {
   member: MemberDefenderRow;
+  /** Big Things: the node this member's defender sits on (null for none). Left out in regular wars. */
+  node?: number | null;
+  /** Node to who holds it, shown in the picker. */
+  nodeHolders?: Record<number, string>;
+  nodeSaving?: boolean;
+  /** Officers: move this member's defender to a node, or off the map with null. */
+  onNodeChange?: (node: number | null) => void;
   isOfficer?: boolean;
   onDefenderClick: (champion: AssignedDefender) => void;
   /** Officers: pick a defender for an open slot. */
@@ -812,11 +915,49 @@ function MemberDefenderRowView({
   /** Print copy: always laid out (no off-screen skipping), images loaded up front. */
   forPrint?: boolean;
 }) {
+  // Big Things: one defender, shown as a narrow tile with the name above it.
+  const single = member.cap === 1;
   return (
     <div
       className="rounded-md border border-ink-line bg-ink-raised/30 overflow-hidden"
       style={forPrint ? undefined : OFFSCREEN_SKIP}
     >
+      {single ? (
+        <div className="flex items-start justify-between gap-1 px-2.5 py-2 border-b border-ink-line/70">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-parchment truncate" title={member.displayName}>
+              {member.displayName}
+            </div>
+            <div
+              className="stat inline-flex items-center gap-1 text-xs text-brass-bright"
+              title="Diversity rating: PI of this defender"
+            >
+              <Shield size={12} fill="currentColor" aria-hidden />
+              {diversityRating(member).toLocaleString()}
+            </div>
+          </div>
+          {node !== undefined && !onNodeChange && (
+            <span
+              className={`shrink-0 rounded-full border px-2 py-0.5 stat text-[11px] ${
+                node ? "border-brass/60 text-brass-bright" : "border-ink-line text-parchment-faint"
+              }`}
+            >
+              {node ? `Node ${node}` : "No node"}
+            </span>
+          )}
+          {onClear && member.assigned > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="shrink-0 rounded-sm p-1 text-crimson-bright hover:bg-crimson/10"
+              title={`Clear ${member.displayName}'s defender`}
+              aria-label={`Clear ${member.displayName}'s defender`}
+            >
+              <Eraser size={13} />
+            </button>
+          )}
+        </div>
+      ) : (
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-ink-line/70">
         <div className="flex min-w-0 items-baseline gap-2">
           <div className="text-sm font-medium text-parchment truncate">{member.displayName}</div>
@@ -843,8 +984,32 @@ function MemberDefenderRowView({
           )}
         </div>
       </div>
+      )}
 
-      <div className={`grid gap-2 p-2.5 ${forPrint ? "grid-cols-5" : "grid-cols-3 sm:grid-cols-5"}`}>
+      {onNodeChange && (
+        <div className="flex items-center gap-1.5 px-2.5 pt-2.5">
+          <select
+            className={`field-input w-full py-1 text-xs ${node ? "text-brass-bright" : ""}`}
+            value={node ?? ""}
+            disabled={nodeSaving}
+            aria-label={`Node for ${member.displayName}'s defender`}
+            onChange={(event) => onNodeChange(event.target.value ? Number(event.target.value) : null)}
+          >
+            <option value="">No node</option>
+            {BIG_THINGS_NODES.map((option) => {
+              const holder = nodeHolders?.[option];
+              return (
+                <option key={option} value={option}>
+                  {holder && option !== node ? `Node ${option} · ${holder}` : `Node ${option}`}
+                </option>
+              );
+            })}
+          </select>
+          {nodeSaving && <Loader2 size={14} className="shrink-0 animate-spin text-brass-bright" aria-hidden />}
+        </div>
+      )}
+
+      <div className={`grid gap-2 p-2.5 ${single ? "grid-cols-1" : forPrint ? "grid-cols-5" : "grid-cols-3 sm:grid-cols-5"}`}>
         {member.defenders.map((champion) => (
           <div key={champion.championId} data-flip-id={forPrint ? undefined : champion.championId}>
             <ChampionCard
@@ -911,6 +1076,7 @@ function defenderDetails(c: AssignedDefender, clickable = false, actionLabel = "
 function ReassignDefenderModal({
   initialTargetUserId,
   rows,
+  cap,
   sourceMember,
   champion,
   onClose,
@@ -919,6 +1085,8 @@ function ReassignDefenderModal({
 }: {
   initialTargetUserId?: string;
   rows: MemberDefenderRow[];
+  /** Defenders each member can hold. */
+  cap: number;
   sourceMember: MemberDefenderRow | null;
   champion: AssignedDefender;
   onClose: () => void;
@@ -964,7 +1132,7 @@ function ReassignDefenderModal({
     if (!targetUserId) return;
     const target = rows.find((member) => member.userId === targetUserId);
     if (!target) return;
-    if (target.assigned >= 5 && !replaceChampionId) return;
+    if (target.assigned >= cap && !replaceChampionId) return;
 
     setSaving(true);
     try {
@@ -974,7 +1142,7 @@ function ReassignDefenderModal({
     }
   }
 
-  const choosingReplacement = Boolean(targetRow && targetRow.assigned >= 5);
+  const choosingReplacement = Boolean(targetRow && targetRow.assigned >= cap);
   // Show the target member's own copy (PI, awakening, ascension) when moving.
   const targetOwner = targetUserId ? champion.owners.find((owner) => owner.userId === targetUserId) : null;
   const shownOwner = targetOwner ?? champion.assignedTo;
@@ -1049,10 +1217,12 @@ function ReassignDefenderModal({
             <div className="p-5">
               <div className="rounded-md border border-brass/30 bg-brass/5 p-3 mb-4">
                 <div className="text-sm text-parchment">
-                  {targetRow?.displayName} already has 5 defenders.
+                  {targetRow?.displayName} already has {cap === 1 ? "a defender" : `${cap} defenders`}.
                 </div>
                 <div className="text-xs text-parchment-faint mt-1">
-                  Choose one of their current defenders to replace with {champion.championName}.
+                  {cap === 1
+                    ? `Choose it to replace it with ${champion.championName}.`
+                    : `Choose one of their current defenders to replace with ${champion.championName}.`}
                 </div>
               </div>
 
@@ -1102,7 +1272,7 @@ function ReassignDefenderModal({
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm text-parchment">{sourceMember ? "Move to" : "Assign to"} {targetRow?.displayName}</div>
-                  <div className="text-xs text-parchment-faint mt-1">They have {targetRow?.assigned ?? 0}/5 defender slots.</div>
+                  <div className="text-xs text-parchment-faint mt-1">They have {targetRow?.assigned ?? 0}/{cap} defender {cap === 1 ? "slot" : "slots"} filled.</div>
                   {targetOwner && <OwnerStatus owner={targetOwner} />}
                 </div>
               </div>

@@ -67,11 +67,16 @@ async function initialize(db: Db): Promise<void> {
     roster.createIndex({ userId: 1, championId: 1 }, { unique: true }),
     defenderOverrides.createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
     currentDefenderAssignments.createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
+    db.collection("bigThingsCurrentDefenderAssignments").createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
     counters.createIndex({ defenderId: 1, counterId: 1 }, { unique: true }),
     counters.createIndex({ counterId: 1 }),
     counterProfiles.createIndex({ championId: 1 }, { unique: true }),
     // One member per attack path or upper-island node, per battlegroup.
     db.collection("attackAssignments").createIndex({ battlegroup: 1, slot: 1 }, { unique: true }),
+    db.collection("bigThingsAttackAssignments").createIndex({ battlegroup: 1, slot: 1 }, { unique: true }),
+    // Big Things defender placement: one member per node, one node per member.
+    db.collection("bigThingsDefenderNodes").createIndex({ battlegroup: 1, node: 1 }, { unique: true }),
+    db.collection("bigThingsDefenderNodes").createIndex({ battlegroup: 1, userId: 1 }, { unique: true }),
     // At most one Leader at a time.
     users.createIndex(
       { role: 1 },
