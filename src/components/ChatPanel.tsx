@@ -82,7 +82,7 @@ export default function ChatPanel({
 export function ChatRoom({
   channel,
   viewer,
-  className = "panel h-[calc(100dvh-15rem)] min-h-[420px] md:h-[calc(100vh-14rem)]"
+  className = "panel h-[calc(100dvh-19rem)] min-h-[320px] md:h-[calc(100dvh-16rem)]"
 }: {
   channel: ChatChannel;
   viewer: Viewer;
@@ -277,16 +277,16 @@ export function ChatRoom({
             return (
               <div key={message.id} className={`group relative flex flex-col ${grouped ? "mt-0.5" : "mt-3 first:mt-0"}`}>
                 {!grouped && (
-                  <div className="flex items-baseline gap-2 mb-0.5">
-                    <span className={`text-sm font-semibold ${mine ? "text-brass-bright" : "text-parchment"}`}>
+                  <div className="flex items-baseline gap-2 mb-0.5 min-w-0">
+                    <span className={`min-w-0 truncate text-sm font-semibold ${mine ? "text-brass-bright" : "text-parchment"}`}>
                       {message.displayName}
                     </span>
                     {roleColor && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: roleColor }}>
+                      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider" style={{ color: roleColor }}>
                         {message.role}
                       </span>
                     )}
-                    <span className="text-[11px] text-parchment-faint">{formatTime(message.createdAt)}</span>
+                    <span className="shrink-0 whitespace-nowrap text-[11px] text-parchment-faint">{formatTime(message.createdAt)}</span>
                   </div>
                 )}
                 <div className="flex items-start gap-2">
