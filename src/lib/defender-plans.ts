@@ -47,6 +47,7 @@ function toAssignments(board: BattlegroupBoard, list: DefenderList): DefenderAss
 
 async function replaceList(
   db: Db,
+  allianceId: ObjectId,
   mode: WarMode,
   battlegroup: number,
   list: DefenderList,
@@ -54,10 +55,11 @@ async function replaceList(
 ) {
   const collection = db.collection(COLLECTIONS[mode][list]);
   const now = new Date();
-  await collection.deleteMany({ battlegroup });
+  await collection.deleteMany({ allianceId, battlegroup });
   if (assignments.length > 0) {
     await collection.insertMany(
       assignments.map((assignment) => ({
+        allianceId,
         battlegroup,
         championId: new ObjectId(assignment.championId),
         userId: new ObjectId(assignment.userId),
@@ -67,12 +69,16 @@ async function replaceList(
   }
   await db
     .collection(PLAN_STATE)
-    .updateOne({ battlegroup }, { $set: { battlegroup, [createdAtField(mode, list)]: now } }, { upsert: true });
+    .updateOne(
+      { allianceId, battlegroup },
+      { $set: { allianceId, battlegroup, [createdAtField(mode, list)]: now } },
+      { upsert: true }
+    );
 }
 
-async function readList(db: Db, mode: WarMode, battlegroup: number, list: DefenderList) {
-  const docs = await db.collection(COLLECTIONS[mode][list]).find({ battlegroup }).toArray();
-  const state = await db.collection(PLAN_STATE).findOne({ battlegroup });
+async function readList(db: Db, allianceId: ObjectId, mode: WarMode, battlegroup: number, list: DefenderList) {
+  const docs = await db.collection(COLLECTIONS[mode][list]).find({ allianceId, battlegroup }).toArray();
+  const state = await db.collection(PLAN_STATE).findOne({ allianceId, battlegroup });
   const exists = docs.length > 0 || Boolean(state?.[createdAtField(mode, list)]);
   const assignments: DefenderAssignment[] = docs.map((doc) => ({
     championId: String(doc.championId),
@@ -81,8 +87,12 @@ async function readList(db: Db, mode: WarMode, battlegroup: number, list: Defend
   return exists ? assignments : null;
 }
 
-async function loadInputs(db: Db, mode: WarMode, battlegroup: number) {
-  const memberDocs = await db.collection("users").find({ battlegroup }).sort({ displayName: 1 }).toArray();
+async function loadInputs(db: Db, allianceId: ObjectId, mode: WarMode, battlegroup: number) {
+  const memberDocs = await db
+    .collection("users")
+    .find({ allianceId, battlegroup })
+    .sort({ displayName: 1 })
+    .toArray();
   const members = memberDocs.map((member) => ({
     userId: member._id.toString(),
     username: member.username as string,
@@ -118,7 +128,7 @@ async function loadInputs(db: Db, mode: WarMode, battlegroup: number) {
 
   // Legacy officer overrides were made for regular wars, so Big Things ignores them.
   const overrideDocs =
-    mode === "regular" ? await db.collection("defenderOverrides").find({ battlegroup }).toArray() : [];
+    mode === "regular" ? await db.collection("defenderOverrides").find({ allianceId, battlegroup }).toArray() : [];
   const overrides: DefenderOverride[] = overrideDocs.map((doc) => ({
     championId: String(doc.championId),
     userId: doc.userId ? String(doc.userId) : null,
@@ -134,40 +144,45 @@ async function loadInputs(db: Db, mode: WarMode, battlegroup: number) {
  * manual overrides) and afterwards only changes through officer edits or the
  * "Auto-suggest" action, so manual changes are never reshuffled.
  */
-export async function loadBattlegroupBoard(db: Db, battlegroup: number, mode: WarMode = "regular") {
-  const { memberDocs, members, rows, overrides } = await loadInputs(db, mode, battlegroup);
+export async function loadBattlegroupBoard(
+  db: Db,
+  allianceId: ObjectId,
+  battlegroup: number,
+  mode: WarMode = "regular"
+) {
+  const { memberDocs, members, rows, overrides } = await loadInputs(db, allianceId, mode, battlegroup);
   const build = (suggested: DefenderAssignment[] | null, current: DefenderAssignment[]) =>
     computeBattlegroupBoard(battlegroup, rows, [], members, defendersPerMember(mode), overrides, current, suggested);
 
-  let suggested = await readList(db, mode, battlegroup, "suggested");
+  let suggested = await readList(db, allianceId, mode, battlegroup, "suggested");
   if (!suggested && members.length > 0) {
     suggested = toAssignments(build(null, []), "suggested");
-    await replaceList(db, mode, battlegroup, "suggested", suggested);
+    await replaceList(db, allianceId, mode, battlegroup, "suggested", suggested);
   }
 
-  let current = await readList(db, mode, battlegroup, "current");
+  let current = await readList(db, allianceId, mode, battlegroup, "current");
   if (!current && suggested && suggested.length > 0) {
     current = suggested;
-    await replaceList(db, mode, battlegroup, "current", current);
+    await replaceList(db, allianceId, mode, battlegroup, "current", current);
   }
 
   return { board: build(suggested ?? [], current ?? []), memberDocs };
 }
 
 /** Rebuilds the suggested list from scratch: best defenders first, highest PI copies. */
-export async function autoSuggest(db: Db, battlegroup: number, mode: WarMode = "regular") {
-  const { members, rows } = await loadInputs(db, mode, battlegroup);
+export async function autoSuggest(db: Db, allianceId: ObjectId, battlegroup: number, mode: WarMode = "regular") {
+  const { members, rows } = await loadInputs(db, allianceId, mode, battlegroup);
   const fresh = computeBattlegroupBoard(battlegroup, rows, [], members, defendersPerMember(mode), [], [], null);
   const assignments = toAssignments(fresh, "suggested");
-  await replaceList(db, mode, battlegroup, "suggested", assignments);
+  await replaceList(db, allianceId, mode, battlegroup, "suggested", assignments);
   return assignments.length;
 }
 
 /** Replaces the current list with the saved suggested list. */
-export async function publishSuggested(db: Db, battlegroup: number, mode: WarMode = "regular") {
-  const { board } = await loadBattlegroupBoard(db, battlegroup, mode);
+export async function publishSuggested(db: Db, allianceId: ObjectId, battlegroup: number, mode: WarMode = "regular") {
+  const { board } = await loadBattlegroupBoard(db, allianceId, battlegroup, mode);
   const assignments = toAssignments(board, "suggested");
-  await replaceList(db, mode, battlegroup, "current", assignments);
+  await replaceList(db, allianceId, mode, battlegroup, "current", assignments);
   return assignments.length;
 }
 
@@ -184,6 +199,7 @@ export type DefenderEdit =
 /** Moves, adds, replaces or removes one defender in the saved suggested plan. */
 export async function editSuggestedPlan(
   db: Db,
+  allianceId: ObjectId,
   battlegroup: number,
   edit: DefenderEdit,
   mode: WarMode = "regular"
@@ -195,7 +211,7 @@ export async function editSuggestedPlan(
   const champion = await db.collection("champions").findOne({ _id: championObjId });
   if (!champion) return { status: 404, error: "Champion not found." };
 
-  const { board, memberDocs } = await loadBattlegroupBoard(db, battlegroup, mode);
+  const { board, memberDocs } = await loadBattlegroupBoard(db, allianceId, battlegroup, mode);
   const listRows = board.suggestedDefenders;
   const additional = board.additionalPossibleDefenders;
   const listName = "suggested plan";
@@ -217,7 +233,7 @@ export async function editSuggestedPlan(
   const collection = db.collection(COLLECTIONS[mode].suggested);
 
   if (edit.action === "remove") {
-    await collection.deleteMany({ battlegroup, championId: idFilter(championObjId) });
+    await collection.deleteMany({ allianceId, battlegroup, championId: idFilter(championObjId) });
     return { status: 200 };
   }
 
@@ -257,18 +273,26 @@ export async function editSuggestedPlan(
 
   // Only this Battlegroup's saved list changes; player rosters are untouched.
   if (replaceObjId) {
-    await collection.deleteMany({ battlegroup, championId: idFilter(replaceObjId) });
+    await collection.deleteMany({ allianceId, battlegroup, championId: idFilter(replaceObjId) });
   }
-  await collection.deleteMany({ battlegroup, championId: idFilter(championObjId) });
-  await collection.insertOne({ battlegroup, championId: championObjId, userId: toObjId, updatedAt: new Date() });
+  await collection.deleteMany({ allianceId, battlegroup, championId: idFilter(championObjId) });
+  await collection.insertOne({ allianceId, battlegroup, championId: championObjId, userId: toObjId, updatedAt: new Date() });
 
   return { status: 200 };
 }
 
 /** Empties one member's defenders in the saved suggested plan. */
-export async function clearMemberDefenders(db: Db, battlegroup: number, userId: string, mode: WarMode = "regular") {
+export async function clearMemberDefenders(
+  db: Db,
+  allianceId: ObjectId,
+  battlegroup: number,
+  userId: string,
+  mode: WarMode = "regular"
+) {
   const userObjId = toObjectId(userId);
   if (!userObjId) return 0;
-  const result = await db.collection(COLLECTIONS[mode].suggested).deleteMany({ battlegroup, userId: idFilter(userObjId) });
+  const result = await db
+    .collection(COLLECTIONS[mode].suggested)
+    .deleteMany({ allianceId, battlegroup, userId: idFilter(userObjId) });
   return result.deletedCount;
 }

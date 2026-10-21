@@ -245,7 +245,7 @@ export default function CounterFinder({
               No counters have been added yet.
               {isOfficer
                 ? " Search a defender above, then use Add counter to list the champions that beat it."
-                : " Officers can add them; search any defender above to check."}
+                : " Counter editors can add them; search any defender above to check."}
             </p>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
@@ -311,7 +311,7 @@ export default function CounterFinder({
                   ? "You don't own any of the listed counters."
                   : isOfficer
                   ? "Use Add counter to list the champions that beat this defender."
-                  : "Officers haven't listed counters for this defender yet."}
+                  : "No counters are listed for this defender yet."}
               </p>
             ) : (
               // Keyed by defender so the cards cascade in again for each new defender.

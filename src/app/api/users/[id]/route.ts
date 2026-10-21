@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, ObjectId, toObjectId } from "@/lib/db";
 import { requireOfficer } from "@/lib/session";
-import { hashPassword, DEFAULT_PASSWORD, isLeaderOrAbove, type Role } from "@/lib/auth";
+import { isLeaderOrAbove, type Role } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/api-handler";
+import { MAX_BATTLEGROUP_MEMBERS, detachFromAlliance } from "@/lib/members";
 
 type DefenderOverrideDoc = { userId?: ObjectId | null; blockedUserIds?: string[] };
+
+// Officers manage roles and battlegroups within their own alliance. Passwords
+// are only ever changed or reset by the account's owner.
 
 const schema = z.object({
   displayName: z.string().trim().min(1).max(60).optional(),
   role: z.enum(["admin", "leader", "officer", "member"]).optional(),
-  battlegroup: z.union([z.literal(1), z.literal(2), z.literal(3), z.null()]).optional(),
-  resetPassword: z.boolean().optional()
+  battlegroup: z.union([z.literal(1), z.literal(2), z.literal(3), z.null()]).optional()
 });
 
 function forbidden(error: string) {
@@ -33,20 +36,24 @@ export const PATCH = withErrorHandling(
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid update." }, { status: 400 });
     }
-    const { displayName, role, battlegroup, resetPassword } = parsed.data;
+    const { displayName, role, battlegroup } = parsed.data;
+    const allianceId = officer.alliance;
 
     const db = await getDb();
     const users = db.collection("users");
 
-    const target = await users.findOne({ _id: userId }, { projection: { role: 1, battlegroup: 1 } });
+    const target = await users.findOne({ _id: userId, allianceId }, { projection: { role: 1, battlegroup: 1 } });
     if (!target) return NextResponse.json({ error: "Member not found." }, { status: 404 });
     const targetRole = target.role as Role;
     const isSelf = params.id === officer.userId;
     const roleChange = role !== undefined && role !== targetRole;
 
-    // Nobody but the Admin can change the Admin's role or reset their password.
-    if (targetRole === "admin" && !isSelf && (roleChange || resetPassword)) {
-      return forbidden("Only the Admin can change their own role or password.");
+    // Nobody but the Admin can change the Admin's role.
+    if (targetRole === "admin" && !isSelf && roleChange) {
+      return forbidden("Only the Admin can change their own role.");
+    }
+    if (displayName !== undefined && !isSelf && !actorIsLeaderOrAbove) {
+      return forbidden("Only the Leader can rename other members.");
     }
 
     // Role changes that must happen before this member's, in order, so there
@@ -57,7 +64,7 @@ export const PATCH = withErrorHandling(
       // Only the Admin can make someone Admin. It's a handover: the Admin
       // becomes Leader and the existing Leader (if any) becomes an officer.
       if (!actorIsAdmin) return forbidden("Only the Admin can make someone else Admin.");
-      const currentLeader = await users.findOne({ role: "leader" }, { projection: { _id: 1 } });
+      const currentLeader = await users.findOne({ allianceId, role: "leader" }, { projection: { _id: 1 } });
       if (currentLeader) stepDowns.push({ id: currentLeader._id, role: "officer" });
       stepDowns.push({ id: new ObjectId(officer.userId), role: "leader" });
     } else if (roleChange) {
@@ -68,7 +75,7 @@ export const PATCH = withErrorHandling(
         // Leadership is handed over by the Leader (or the Admin); the old
         // Leader becomes an officer. If nobody is Leader yet, any officer may
         // appoint one.
-        const currentLeader = await users.findOne({ role: "leader" }, { projection: { _id: 1 } });
+        const currentLeader = await users.findOne({ allianceId, role: "leader" }, { projection: { _id: 1 } });
         if (currentLeader && !actorIsLeaderOrAbove) {
           return forbidden("Only the Leader or the Admin can hand over leadership.");
         }
@@ -78,7 +85,7 @@ export const PATCH = withErrorHandling(
         return forbidden("Only the Leader or the Admin can remove an officer.");
       }
       if (isSelf && role === "member") {
-        const officerCount = await users.countDocuments({ role: { $in: ["officer", "leader", "admin"] } });
+        const officerCount = await users.countDocuments({ allianceId, role: { $in: ["officer", "leader", "admin"] } });
         if (officerCount <= 1) {
           return NextResponse.json(
             { error: "You're the only officer — promote someone else first." },
@@ -88,15 +95,11 @@ export const PATCH = withErrorHandling(
       }
     }
 
-    if (resetPassword && targetRole !== "member" && !actorIsLeaderOrAbove) {
-      return forbidden("Only the Leader or the Admin can reset an officer's password.");
-    }
-
     if (battlegroup !== undefined && battlegroup !== null && target.battlegroup !== battlegroup) {
-      const memberCount = await users.countDocuments({ battlegroup });
-      if (memberCount >= 10) {
+      const memberCount = await users.countDocuments({ allianceId, battlegroup });
+      if (memberCount >= MAX_BATTLEGROUP_MEMBERS) {
         return NextResponse.json(
-          { error: `Battlegroup ${battlegroup} is full. Each battlegroup can have at most 10 members.` },
+          { error: `Battlegroup ${battlegroup} is full. Each battlegroup can have at most ${MAX_BATTLEGROUP_MEMBERS} members.` },
           { status: 400 }
         );
       }
@@ -106,16 +109,12 @@ export const PATCH = withErrorHandling(
     if (displayName !== undefined) set.displayName = displayName;
     if (role !== undefined) set.role = role;
     if (battlegroup !== undefined) set.battlegroup = battlegroup;
-    if (resetPassword) {
-      set.passwordHash = hashPassword(DEFAULT_PASSWORD);
-      set.mustChangePassword = true;
-    }
 
     for (const step of stepDowns) {
-      await users.updateOne({ _id: step.id }, { $set: { role: step.role } });
+      await users.updateOne({ _id: step.id, allianceId }, { $set: { role: step.role } });
     }
     if (Object.keys(set).length > 0) {
-      await users.updateOne({ _id: userId }, { $set: set });
+      await users.updateOne({ _id: userId, allianceId }, { $set: set });
     }
 
     // A Battlegroup defender override only makes sense while the member is
@@ -124,17 +123,19 @@ export const PATCH = withErrorHandling(
     // removes them from a group.
     if (battlegroup !== undefined) {
       const overrides = db.collection<DefenderOverrideDoc>("defenderOverrides");
-      await overrides.deleteMany({ battlegroup: { $ne: battlegroup }, userId });
+      await overrides.deleteMany({ allianceId, battlegroup: { $ne: battlegroup }, userId });
       await overrides.updateMany(
-        {},
+        { allianceId },
         { $pull: { blockedUserIds: userId.toString() } }
       );
     }
 
-    return NextResponse.json({ ok: true, defaultPassword: resetPassword ? DEFAULT_PASSWORD : undefined });
+    return NextResponse.json({ ok: true });
   }
 );
 
+// Removes a member from the alliance. Their account and roster are kept, so
+// they can join another alliance (or rejoin with the code).
 export const DELETE = withErrorHandling(
   "DELETE /api/users/[id]",
   async (_req: NextRequest, { params }: { params: { id: string } }) => {
@@ -142,14 +143,16 @@ export const DELETE = withErrorHandling(
     if (!officer) return NextResponse.json({ error: "Officers only." }, { status: 403 });
 
     if (params.id === officer.userId) {
-      return NextResponse.json({ error: "You can't remove your own account." }, { status: 400 });
+      return NextResponse.json({ error: "Use Leave alliance to remove yourself." }, { status: 400 });
     }
 
     const userId = toObjectId(params.id);
     if (!userId) return NextResponse.json({ error: "Member not found." }, { status: 404 });
 
     const db = await getDb();
-    const target = await db.collection("users").findOne({ _id: userId }, { projection: { role: 1 } });
+    const target = await db
+      .collection("users")
+      .findOne({ _id: userId, allianceId: officer.alliance }, { projection: { role: 1 } });
     if (!target) return NextResponse.json({ error: "Member not found." }, { status: 404 });
     if (target.role === "admin") {
       return NextResponse.json({ error: "The Admin can't be removed." }, { status: 403 });
@@ -161,17 +164,7 @@ export const DELETE = withErrorHandling(
       return NextResponse.json({ error: "Only the Leader or the Admin can remove an officer." }, { status: 403 });
     }
 
-    const result = await db.collection("users").deleteOne({ _id: userId });
-    if (result.deletedCount === 0) {
-      return NextResponse.json({ error: "Member not found." }, { status: 404 });
-    }
-    await db.collection("rosterEntries").deleteMany({ userId });
-    await db.collection("defenderOverrides").deleteMany({ userId });
-    await db.collection<DefenderOverrideDoc>("defenderOverrides").updateMany(
-      {},
-      { $pull: { blockedUserIds: userId.toString() } }
-    );
-
+    await detachFromAlliance(db, officer.alliance, userId);
     return NextResponse.json({ ok: true });
   }
 );

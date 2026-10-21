@@ -6,6 +6,7 @@ import { ObjectId } from "./db";
 export const DEFENDER_NODES = "bigThingsDefenderNodes";
 
 type DefenderNodeDoc = {
+  allianceId: ObjectId;
   battlegroup: number;
   node: number;
   userId: ObjectId;
@@ -14,10 +15,14 @@ type DefenderNodeDoc = {
 };
 
 /** Member id to node for one battlegroup. Placements of members who have left are dropped. */
-export async function loadDefenderNodes(db: Db, battlegroup: number): Promise<Record<string, number>> {
+export async function loadDefenderNodes(
+  db: Db,
+  allianceId: ObjectId,
+  battlegroup: number
+): Promise<Record<string, number>> {
   const [members, docs] = await Promise.all([
-    db.collection("users").find({ battlegroup }, { projection: { _id: 1 } }).toArray(),
-    db.collection<DefenderNodeDoc>(DEFENDER_NODES).find({ battlegroup }).toArray()
+    db.collection("users").find({ allianceId, battlegroup }, { projection: { _id: 1 } }).toArray(),
+    db.collection<DefenderNodeDoc>(DEFENDER_NODES).find({ allianceId, battlegroup }).toArray()
   ]);
   const memberIds = new Set(members.map((member) => member._id.toString()));
   const nodes: Record<string, number> = {};
@@ -34,23 +39,29 @@ export async function loadDefenderNodes(db: Db, battlegroup: number): Promise<Re
  */
 export async function setDefenderNode(
   db: Db,
-  { battlegroup, node, userId, actorId }: { battlegroup: number; node: number; userId: string | null; actorId: string }
+  {
+    allianceId,
+    battlegroup,
+    node,
+    userId,
+    actorId
+  }: { allianceId: ObjectId; battlegroup: number; node: number; userId: string | null; actorId: string }
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   const collection = db.collection<DefenderNodeDoc>(DEFENDER_NODES);
 
   if (userId === null) {
-    await collection.deleteOne({ battlegroup, node });
+    await collection.deleteOne({ allianceId, battlegroup, node });
     return { ok: true };
   }
 
   const target = new ObjectId(userId);
-  const member = await db.collection("users").findOne({ _id: target, battlegroup }, { projection: { _id: 1 } });
+  const member = await db.collection("users").findOne({ _id: target, allianceId, battlegroup }, { projection: { _id: 1 } });
   if (!member) return { ok: false, status: 400, error: `That member isn't in Battlegroup ${battlegroup}.` };
 
-  await collection.deleteMany({ battlegroup, userId: target, node: { $ne: node } });
+  await collection.deleteMany({ allianceId, battlegroup, userId: target, node: { $ne: node } });
   await collection.replaceOne(
-    { battlegroup, node },
-    { battlegroup, node, userId: target, updatedBy: new ObjectId(actorId), updatedAt: new Date() },
+    { allianceId, battlegroup, node },
+    { allianceId, battlegroup, node, userId: target, updatedBy: new ObjectId(actorId), updatedAt: new Date() },
     { upsert: true }
   );
   return { ok: true };

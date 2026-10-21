@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Barlow_Condensed, Inter, JetBrains_Mono } from "next/font/google";
+import { cookies } from "next/headers";
+import { EMBED_COOKIE } from "@/lib/auth";
 import "./globals.css";
 
 const display = Barlow_Condensed({
@@ -17,7 +19,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${stat.variable}`}>
+    // Inside the mobile app the native tabs replace the web navigation.
+    <html
+      lang="en"
+      className={`${display.variable} ${body.variable} ${stat.variable}`}
+      data-embed={cookies().get(EMBED_COOKIE)?.value === "1" ? "1" : undefined}
+    >
       <body>{children}</body>
     </html>
   );

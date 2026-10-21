@@ -1,5 +1,5 @@
+import { randomInt } from "crypto";
 import { MongoClient, Db, ObjectId } from "mongodb";
-import bcrypt from "bcryptjs";
 import { SEED_CHAMPIONS } from "./seed-champions";
 
 declare global {
@@ -52,41 +52,143 @@ export function championKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
+// Collections holding one alliance's battlegroup plans. Each document carries
+// the alliance's id so alliances never see each other's plans.
+export const ALLIANCE_SCOPED_COLLECTIONS = [
+  "defenderOverrides",
+  "suggestedDefenderAssignments",
+  "currentDefenderAssignments",
+  "bigThingsSuggestedDefenderAssignments",
+  "bigThingsCurrentDefenderAssignments",
+  "defenderPlanState",
+  "attackAssignments",
+  "bigThingsAttackAssignments",
+  "bigThingsDefenderNodes",
+  "chatMessages"
+] as const;
+
+async function dropIndexIfExists(db: Db, collection: string, name: string) {
+  try {
+    await db.collection(collection).dropIndex(name);
+  } catch {
+    // Missing index or collection: nothing to drop.
+  }
+}
+
+/**
+ * Databases from before alliances existed hold a single alliance's data with
+ * no alliance id. Put all of it into one alliance so it keeps working, and
+ * let that alliance's officers keep editing the shared champion and counter
+ * data. Runs once; later starts find nothing to move.
+ */
+async function migrateToAlliances(db: Db): Promise<void> {
+  const users = db.collection("users");
+  const legacyUsers = await users.countDocuments({ allianceId: { $exists: false } });
+  if (legacyUsers === 0) return;
+
+  // Old single-alliance unique indexes would clash with per-alliance ones.
+  await Promise.all([
+    dropIndexIfExists(db, "users", "single_leader"),
+    dropIndexIfExists(db, "users", "single_admin"),
+    dropIndexIfExists(db, "defenderOverrides", "battlegroup_1_championId_1"),
+    dropIndexIfExists(db, "currentDefenderAssignments", "battlegroup_1_championId_1"),
+    dropIndexIfExists(db, "bigThingsCurrentDefenderAssignments", "battlegroup_1_championId_1"),
+    dropIndexIfExists(db, "attackAssignments", "battlegroup_1_slot_1"),
+    dropIndexIfExists(db, "bigThingsAttackAssignments", "battlegroup_1_slot_1"),
+    dropIndexIfExists(db, "bigThingsDefenderNodes", "battlegroup_1_node_1"),
+    dropIndexIfExists(db, "bigThingsDefenderNodes", "battlegroup_1_userId_1")
+  ]);
+
+  const warModeDoc = await db.collection<{ _id: string; mode?: string }>("allianceSettings").findOne({ _id: "warMode" });
+  const now = new Date();
+  await db.collection("alliances").updateOne(
+    { legacy: true },
+    {
+      $setOnInsert: {
+        legacy: true,
+        name: process.env.LEGACY_ALLIANCE_NAME?.trim() || "My Alliance",
+        code: generateAllianceCode(),
+        warMode: warModeDoc?.mode === "bigThings" ? "bigThings" : "regular",
+        createdAt: now
+      }
+    },
+    { upsert: true }
+  );
+  const alliance = await db.collection("alliances").findOne({ legacy: true }, { projection: { _id: 1 } });
+  const allianceId = alliance!._id;
+
+  await users.updateMany(
+    { allianceId: { $exists: false }, role: { $in: ["admin", "leader", "officer"] } },
+    { $set: { gameDataEditor: true } }
+  );
+  await users.updateMany({ allianceId: { $exists: false } }, { $set: { allianceId } });
+  for (const name of ALLIANCE_SCOPED_COLLECTIONS) {
+    await db.collection(name).updateMany({ allianceId: { $exists: false } }, { $set: { allianceId } });
+  }
+  console.log(`Moved ${legacyUsers} existing members into the alliance ${String(allianceId)}.`);
+}
+
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O or 1/I
+
+/** A random 8-character alliance join code, easy to read out and type. */
+export function generateAllianceCode(): string {
+  return Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
+}
+
 async function initialize(db: Db): Promise<void> {
   const users = db.collection("users");
   const champions = db.collection("champions");
   const roster = db.collection("rosterEntries");
-  const defenderOverrides = db.collection("defenderOverrides");
-  const currentDefenderAssignments = db.collection("currentDefenderAssignments");
   const counters = db.collection("counters");
   const counterProfiles = db.collection("counterProfiles");
 
+  await migrateToAlliances(db);
+
+  const byAllianceBg = { allianceId: 1, battlegroup: 1 } as const;
   await Promise.all([
     users.createIndex({ username: 1 }, { unique: true, collation: CASE_INSENSITIVE }),
+    users.createIndex(
+      { email: 1 },
+      { name: "unique_email", unique: true, partialFilterExpression: { email: { $type: "string" } } }
+    ),
+    users.createIndex(
+      { googleId: 1 },
+      { name: "unique_google", unique: true, partialFilterExpression: { googleId: { $type: "string" } } }
+    ),
+    users.createIndex(byAllianceBg),
+    // At most one Leader and one Admin per alliance. Different key directions
+    // keep them separate indexes.
+    users.createIndex(
+      { allianceId: 1, role: 1 },
+      { name: "alliance_single_leader", unique: true, partialFilterExpression: { role: "leader" } }
+    ),
+    users.createIndex(
+      { allianceId: -1, role: -1 },
+      { name: "alliance_single_admin", unique: true, partialFilterExpression: { role: "admin" } }
+    ),
+    db.collection("alliances").createIndex({ code: 1 }, { unique: true }),
+    db.collection("passwordResets").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection("passwordResets").createIndex({ userId: 1 }),
     champions.createIndex({ name: 1 }, { unique: true, collation: CASE_INSENSITIVE }),
     roster.createIndex({ userId: 1, championId: 1 }, { unique: true }),
-    defenderOverrides.createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
-    currentDefenderAssignments.createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
-    db.collection("bigThingsCurrentDefenderAssignments").createIndex({ battlegroup: 1, championId: 1 }, { unique: true }),
+    db.collection("defenderOverrides").createIndex({ ...byAllianceBg, championId: 1 }, { unique: true }),
+    db.collection("currentDefenderAssignments").createIndex({ ...byAllianceBg, championId: 1 }, { unique: true }),
+    db.collection("bigThingsCurrentDefenderAssignments").createIndex({ ...byAllianceBg, championId: 1 }, { unique: true }),
+    db.collection("suggestedDefenderAssignments").createIndex(byAllianceBg),
+    db.collection("bigThingsSuggestedDefenderAssignments").createIndex(byAllianceBg),
+    db.collection("defenderPlanState").createIndex(byAllianceBg),
     counters.createIndex({ defenderId: 1, counterId: 1 }, { unique: true }),
     counters.createIndex({ counterId: 1 }),
     counterProfiles.createIndex({ championId: 1 }, { unique: true }),
     // One member per attack path or upper-island node, per battlegroup.
-    db.collection("attackAssignments").createIndex({ battlegroup: 1, slot: 1 }, { unique: true }),
-    db.collection("bigThingsAttackAssignments").createIndex({ battlegroup: 1, slot: 1 }, { unique: true }),
+    db.collection("attackAssignments").createIndex({ ...byAllianceBg, slot: 1 }, { unique: true }),
+    db.collection("bigThingsAttackAssignments").createIndex({ ...byAllianceBg, slot: 1 }, { unique: true }),
     // Big Things defender placement: one member per node, one node per member.
-    db.collection("bigThingsDefenderNodes").createIndex({ battlegroup: 1, node: 1 }, { unique: true }),
-    db.collection("bigThingsDefenderNodes").createIndex({ battlegroup: 1, userId: 1 }, { unique: true }),
-    // At most one Leader at a time.
-    users.createIndex(
-      { role: 1 },
-      { name: "single_leader", unique: true, partialFilterExpression: { role: "leader" } }
-    ),
-    // At most one Admin. A different key direction keeps it a separate index.
-    users.createIndex(
-      { role: -1 },
-      { name: "single_admin", unique: true, partialFilterExpression: { role: "admin" } }
-    )
+    db.collection("bigThingsDefenderNodes").createIndex({ ...byAllianceBg, node: 1 }, { unique: true }),
+    db.collection("bigThingsDefenderNodes").createIndex({ ...byAllianceBg, userId: 1 }, { unique: true }),
+    // Alliance and battlegroup chat, read newest first.
+    db.collection("chatMessages").createIndex({ allianceId: 1, channel: 1, _id: -1 }),
+    db.collection("chatMessages").createIndex({ userId: 1 })
   ]);
 
   const existingChampions = await champions
@@ -95,7 +197,7 @@ async function initialize(db: Db): Promise<void> {
   const existingNames = new Set(
     existingChampions.map((champion) => String(champion.name).toLowerCase())
   );
-  // Champions an officer deleted stay deleted; otherwise every restart or
+  // Champions an editor deleted stay deleted; otherwise every restart or
   // redeploy would add them back from the seed list.
   const removedNames = new Set(
     (await db.collection(REMOVED_CHAMPIONS).find({}, { projection: { key: 1 } }).toArray()).map((doc) =>
@@ -109,21 +211,6 @@ async function initialize(db: Db): Promise<void> {
   if (missingChampions.length > 0) {
     await champions.insertMany(missingChampions);
     console.log(`Added ${missingChampions.length} new champions to the database.`);
-  }
-
-  const userCount = await users.countDocuments();
-  if (userCount === 0) {
-    const username = process.env.BOOTSTRAP_OFFICER_USERNAME || "officer";
-    const password = process.env.BOOTSTRAP_OFFICER_PASSWORD || "12345678";
-    await users.insertOne({
-      username,
-      displayName: "Alliance Officer",
-      passwordHash: bcrypt.hashSync(password, 10),
-      role: "admin" as const,
-      battlegroup: null as 1 | 2 | 3 | null,
-      mustChangePassword: true,
-      createdAt: new Date()
-    });
   }
 }
 

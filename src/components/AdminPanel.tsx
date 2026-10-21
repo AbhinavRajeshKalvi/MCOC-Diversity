@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Crown, Gem, Link2, Plus, Search, Shield, Trash2 } from "lucide-react";
+import Link from "next/link";
 import ChampionCard from "./ChampionCard";
 import ChampionPicker from "./ChampionPicker";
 import { EditChampionModal } from "./RosterManager";
@@ -24,17 +25,19 @@ type Champion = { id: string; name: string; imageUrl: string | null };
 export default function AdminPanel({
   initialUsers,
   initialChampions,
-  viewer
+  viewer,
+  canEditChampions
 }: {
   initialUsers: User[];
   initialChampions: Champion[];
   viewer: Viewer;
+  canEditChampions: boolean;
 }) {
   return (
     <div className="space-y-10">
       <MembersSection initialUsers={initialUsers} viewer={viewer} />
       <MemberRosterSection users={initialUsers} champions={initialChampions} />
-      <ChampionsSection initialChampions={initialChampions} />
+      {canEditChampions && <ChampionsSection initialChampions={initialChampions} />}
     </div>
   );
 }
@@ -52,8 +55,7 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
 
   // Mirrors the server rules. One Admin (above everyone) and one Leader.
   // Only the Admin can change the Admin or the Leader; the Leader and Admin
-  // can demote/remove officers and reset their passwords; while there's no
-  // Admin, the Leader appoints the first one.
+  // can demote/remove officers. Members reset their own passwords.
   const canChangeRole = (u: User) => {
     if (u.role === "admin") return u.id === viewer.userId;
     if (u.role === "leader") return viewerIsAdmin;
@@ -62,7 +64,6 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
   };
   const canAppointAdmin = viewerIsAdmin;
   const canAppointLeader = viewerIsLeaderOrAbove || !hasLeader;
-  const canResetPassword = (u: User) => u.role === "member" || (u.role !== "admin" && viewerIsLeaderOrAbove);
   const canRemove = (u: User) =>
     u.id !== viewer.userId &&
     (u.role === "member" || (u.role === "officer" && viewerIsLeaderOrAbove) || (u.role === "leader" && viewerIsAdmin));
@@ -106,14 +107,11 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
       setError(data.error ?? "Couldn't update that member.");
       return;
     }
-    if (data.defaultPassword) {
-      setNotice(`Password reset. New default password: ${data.defaultPassword}`);
-    }
     await refresh();
   }
 
   async function removeUser(u: User) {
-    if (!window.confirm(`Remove ${u.displayName}? Their roster will be deleted too.`)) return;
+    if (!window.confirm(`Remove ${u.displayName} from the alliance? They keep their account and roster and can rejoin with the code.`)) return;
     const id = u.id;
     setError(null);
     const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
@@ -123,28 +121,6 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
       return;
     }
     setUsers((u) => u.filter((x) => x.id !== id));
-  }
-
-  async function addUser(form: {
-    username: string;
-    displayName: string;
-    role: "officer" | "member";
-    battlegroup: number | null;
-  }) {
-    setError(null);
-    setNotice(null);
-    const res = await fetch("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Couldn't add that member.");
-      return;
-    }
-    setNotice(`${form.displayName} added. Default password: ${data.defaultPassword}`);
-    await refresh();
   }
 
   return (
@@ -159,7 +135,9 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
       </div>
       <p className="text-sm text-parchment-faint mb-4">
         Assign each member to a battlegroup so their roster feeds into that board's diversity
-        suggestions. The Admin has every permission. The Leader and the Admin are the only ones who can remove officers.
+        suggestions. The Leader and the Admin are the only ones who can remove officers. New members join with the
+        code on the <Link href="/alliance" className="text-brass-bright hover:underline">Alliance</Link> page, and
+        everyone manages their own password.
       </p>
       {!hasLeader && (
         <p className="text-sm text-brass bg-brass/10 border border-brass/30 rounded-sm px-3 py-2 mb-3">
@@ -172,8 +150,6 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
         </p>
       )}
       {error && <p className="text-sm text-crimson-bright mb-3">{error}</p>}
-
-      <AddMemberForm onAdd={addUser} />
 
       {/* Phones and narrow screens: one card per member so every action stays in view. */}
       <ul className="xl:hidden mt-4 grid gap-3 md:grid-cols-2">
@@ -229,16 +205,8 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
                 </select>
               </div>
             </div>
-            {(canResetPassword(u) || canRemove(u)) && (
+            {canRemove(u) && (
               <div className="flex flex-wrap gap-2 mt-3">
-                {canResetPassword(u) && (
-                  <button
-                    onClick={() => patchUser(u.id, { resetPassword: true })}
-                    className="btn-ghost flex-1 py-1.5 text-xs text-brass"
-                  >
-                    Reset password
-                  </button>
-                )}
                 {canRemove(u) && (
                   <button onClick={() => removeUser(u)} className="btn-danger flex-1 py-1.5 text-xs">
                     Remove
@@ -312,14 +280,6 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-right space-x-3 whitespace-nowrap">
-                  {canResetPassword(u) && (
-                    <button
-                      onClick={() => patchUser(u.id, { resetPassword: true })}
-                      className="text-xs text-brass hover:text-brass-bright"
-                    >
-                      Reset password
-                    </button>
-                  )}
                   {canRemove(u) && (
                     <button
                       onClick={() => removeUser(u)}
@@ -335,92 +295,6 @@ function MembersSection({ initialUsers, viewer }: { initialUsers: User[]; viewer
         </table>
       </div>
     </section>
-  );
-}
-
-function AddMemberForm({
-  onAdd
-}: {
-  onAdd: (form: {
-    username: string;
-    displayName: string;
-    role: "officer" | "member";
-    battlegroup: number | null;
-  }) => Promise<void>;
-}) {
-  const [username, setUsername] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [role, setRole] = useState<"officer" | "member">("member");
-  const [battlegroup, setBattlegroup] = useState<string>("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    await onAdd({
-      username,
-      displayName,
-      role,
-      battlegroup: battlegroup ? Number(battlegroup) : null
-    });
-    setSubmitting(false);
-    setUsername("");
-    setDisplayName("");
-    setRole("member");
-    setBattlegroup("");
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="panel p-5">
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-        <div>
-          <label className="field-label">Display name</label>
-          <input
-            className="field-input"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label className="field-label">Username</label>
-          <input
-            className="field-input"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label className="field-label">Role</label>
-          <select
-            className="field-input"
-            value={role}
-            onChange={(e) => setRole(e.target.value as "officer" | "member")}
-          >
-            <option value="member">Member</option>
-            <option value="officer">Officer</option>
-          </select>
-        </div>
-        <div>
-          <label className="field-label">Battlegroup</label>
-          <select
-            className="field-input"
-            value={battlegroup}
-            onChange={(e) => setBattlegroup(e.target.value)}
-          >
-            <option value="">Unassigned</option>
-            <option value="1">Battlegroup 1</option>
-            <option value="2">Battlegroup 2</option>
-            <option value="3">Battlegroup 3</option>
-          </select>
-        </div>
-        <button type="submit" disabled={submitting} className="btn-primary col-span-2 lg:col-span-1">
-          <Plus size={14} />
-          {submitting ? "Adding…" : "Add member"}
-        </button>
-      </div>
-    </form>
   );
 }
 

@@ -1,45 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
-import { verifyPassword, signSession, SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/auth";
+import { verifyPassword } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/api-handler";
+import { CASE_INSENSITIVE, loginResponse, normalizeEmail } from "@/lib/accounts";
+import { allowRequest, clientIp } from "@/lib/rate-limit";
 
 const schema = z.object({
-  username: z.string().min(1),
+  // A username or an email address.
+  username: z.string().trim().min(1),
   password: z.string().min(1)
 });
 
 export const POST = withErrorHandling("POST /api/auth/login", async (req: NextRequest) => {
+  if (!allowRequest(`login:${clientIp(req.headers)}`, 20, 10 * 60_000)) {
+    return NextResponse.json({ error: "Too many sign-in attempts. Wait a few minutes and try again." }, { status: 429 });
+  }
   const body = schema.safeParse(await req.json().catch(() => null));
   if (!body.success) {
-    return NextResponse.json({ error: "Enter a username and password." }, { status: 400 });
+    return NextResponse.json({ error: "Enter your username or email and your password." }, { status: 400 });
   }
   const { username, password } = body.data;
 
   const db = await getDb();
-  const user = await db
-    .collection("users")
-    .findOne({ username }, { collation: { locale: "en", strength: 2 } });
+  const users = db.collection("users");
+  const user = username.includes("@")
+    ? await users.findOne({ email: normalizeEmail(username) })
+    : await users.findOne({ username }, { collation: CASE_INSENSITIVE });
 
   if (!user || !verifyPassword(password, user.passwordHash)) {
-    return NextResponse.json({ error: "Incorrect username or password." }, { status: 401 });
+    const googleOnly = user && !user.passwordHash && user.googleId;
+    return NextResponse.json(
+      { error: googleOnly ? "This account uses Google sign-in." : "Incorrect username or password." },
+      { status: 401 }
+    );
   }
 
-  const token = await signSession({
-    userId: user._id.toString(),
-    username: user.username,
-    displayName: user.displayName,
-    role: user.role,
-    mustChangePassword: Boolean(user.mustChangePassword)
-  });
-
-  const res = NextResponse.json({ ok: true, mustChangePassword: Boolean(user.mustChangePassword) });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_MAX_AGE
-  });
-  return res;
+  return loginResponse(req, db, user);
 });

@@ -13,14 +13,22 @@ export const revalidate = 0;
  * Whose roster a request works on: the signed-in user by default, or another
  * member (`userId`) when an officer, the Leader or the Admin is editing it.
  */
-async function resolveRosterOwner(session: { userId: string; role: string }, requestedUserId: string | null | undefined) {
+async function resolveRosterOwner(
+  session: { userId: string; role: string; allianceId: string | null },
+  requestedUserId: string | null | undefined
+) {
   if (!requestedUserId || requestedUserId === session.userId) return { userId: new ObjectId(session.userId) };
-  if (!isOfficerRole(session.role)) {
+  if (!isOfficerRole(session.role) || !session.allianceId) {
     return { error: NextResponse.json({ error: "Only officers can edit another member's roster." }, { status: 403 }) };
   }
   const userId = toObjectId(requestedUserId);
   const db = await getDb();
-  if (!userId || !(await db.collection("users").findOne({ _id: userId }, { projection: { _id: 1 } }))) {
+  const inAlliance =
+    userId &&
+    (await db
+      .collection("users")
+      .findOne({ _id: userId, allianceId: new ObjectId(session.allianceId) }, { projection: { _id: 1 } }));
+  if (!userId || !inAlliance) {
     return { error: NextResponse.json({ error: "Member not found." }, { status: 404 }) };
   }
   return { userId };

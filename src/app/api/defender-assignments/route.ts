@@ -48,7 +48,7 @@ const schema = z.discriminatedUnion("action", [
 export const POST = withErrorHandling(
   "POST /api/defender-assignments",
   async (req: NextRequest) => {
-    await requireOfficer();
+    const session = await requireOfficer();
 
     const parsed = schema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
@@ -57,19 +57,19 @@ export const POST = withErrorHandling(
 
     const { battlegroup, mode: requestedMode, ...edit } = parsed.data;
     const db = await getDb();
-    const mode = requestedMode ?? (await getWarMode(db));
+    const mode = requestedMode ?? (await getWarMode(db, session.alliance));
 
     if (edit.action === "auto-suggest") {
-      const assigned = await autoSuggest(db, battlegroup, mode);
+      const assigned = await autoSuggest(db, session.alliance, battlegroup, mode);
       return NextResponse.json({ ok: true, battlegroup, assigned });
     }
 
     if (edit.action === "clear") {
-      const cleared = await clearMemberDefenders(db, battlegroup, edit.userId, mode);
+      const cleared = await clearMemberDefenders(db, session.alliance, battlegroup, edit.userId, mode);
       return NextResponse.json({ ok: true, battlegroup, cleared });
     }
 
-    const result = await editSuggestedPlan(db, battlegroup, edit, mode);
+    const result = await editSuggestedPlan(db, session.alliance, battlegroup, edit, mode);
     if (result.error) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json({ ok: true });
   }

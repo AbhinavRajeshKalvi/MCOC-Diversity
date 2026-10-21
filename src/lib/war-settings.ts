@@ -2,23 +2,17 @@ import type { Db } from "mongodb";
 import { ObjectId } from "./db";
 import { isWarMode, type WarMode } from "./war-mode";
 
-const SETTINGS = "allianceSettings";
-const WAR_MODE_ID = "warMode";
-
-type WarModeDoc = { _id: string; mode: WarMode; updatedBy?: ObjectId; updatedAt?: Date };
-
-/** The alliance-wide war mode. Defaults to regular until an officer changes it. */
-export async function getWarMode(db: Db): Promise<WarMode> {
-  const doc = await db.collection<WarModeDoc>(SETTINGS).findOne({ _id: WAR_MODE_ID });
-  return isWarMode(doc?.mode) ? doc.mode : "regular";
+/** The alliance's war mode. Defaults to regular until an officer changes it. */
+export async function getWarMode(db: Db, allianceId: ObjectId): Promise<WarMode> {
+  const doc = await db.collection("alliances").findOne({ _id: allianceId }, { projection: { warMode: 1 } });
+  return isWarMode(doc?.warMode) ? doc.warMode : "regular";
 }
 
-export async function setWarMode(db: Db, mode: WarMode, actorId: string): Promise<void> {
+export async function setWarMode(db: Db, allianceId: ObjectId, mode: WarMode, actorId: string): Promise<void> {
   await db
-    .collection<WarModeDoc>(SETTINGS)
+    .collection("alliances")
     .updateOne(
-      { _id: WAR_MODE_ID },
-      { $set: { mode, updatedBy: new ObjectId(actorId), updatedAt: new Date() } },
-      { upsert: true }
+      { _id: allianceId },
+      { $set: { warMode: mode, warModeUpdatedBy: new ObjectId(actorId), warModeUpdatedAt: new Date() } }
     );
 }

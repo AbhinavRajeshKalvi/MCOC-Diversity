@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, toObjectId } from "@/lib/db";
-import { requireSession } from "@/lib/session";
+import { requireAlliance } from "@/lib/session";
 import { isOfficerRole } from "@/lib/auth";
 import { isValidSlot } from "@/lib/attack-map";
 import { loadAttackBoard, setAttackSlot } from "@/lib/attack-plans";
@@ -24,19 +24,19 @@ const schema = z.object({
 // battlegroup's updated map. Officers can set anything; members can only take
 // or leave a spot on the upper islands for themselves.
 export const POST = withErrorHandling("POST /api/attack-assignments", async (req: NextRequest) => {
-  const session = await requireSession().catch(() => null);
-  if (!session) return NextResponse.json({ error: "Please sign in again." }, { status: 401 });
+  const session = await requireAlliance();
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success || (parsed.data.userId && !toObjectId(parsed.data.userId))) {
     return NextResponse.json({ error: "Invalid attack assignment." }, { status: 400 });
   }
   const db = await getDb();
-  const mode = parsed.data.mode ?? (await getWarMode(db));
+  const mode = parsed.data.mode ?? (await getWarMode(db, session.alliance));
   const { battlegroup, slot, userId } = parsed.data;
   if (!isValidSlot(slot, mode)) return NextResponse.json({ error: "Invalid attack assignment." }, { status: 400 });
 
   const result = await setAttackSlot(db, {
+    allianceId: session.alliance,
     mode,
     battlegroup,
     slot,
@@ -46,5 +46,5 @@ export const POST = withErrorHandling("POST /api/attack-assignments", async (req
   });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
 
-  return NextResponse.json({ ok: true, board: await loadAttackBoard(db, battlegroup, mode) });
+  return NextResponse.json({ ok: true, board: await loadAttackBoard(db, session.alliance, battlegroup, mode) });
 });

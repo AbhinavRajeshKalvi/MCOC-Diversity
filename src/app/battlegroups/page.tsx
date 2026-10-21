@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { requirePageSession } from "@/lib/session";
 import { isOfficerRole } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { getDb, type ObjectId } from "@/lib/db";
 import type { BattlegroupBoard } from "@/lib/diversity";
 import { loadBattlegroupBoard } from "@/lib/defender-plans";
 import { getWarMode } from "@/lib/war-settings";
@@ -15,7 +14,7 @@ import WarModeSwitch from "@/components/WarModeSwitch";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-async function loadBoards(): Promise<{
+async function loadBoards(allianceId: ObjectId): Promise<{
   mode: WarMode;
   boards: BattlegroupBoard[];
   defenderNodes: Record<number, Record<string, number>>;
@@ -27,16 +26,16 @@ async function loadBoards(): Promise<{
   }[];
 }> {
   const db = await getDb();
-  const mode = await getWarMode(db);
+  const mode = await getWarMode(db, allianceId);
   const boards: BattlegroupBoard[] = [];
   // Big Things only: which node each member's defender sits on.
   const defenderNodes: Record<number, Record<string, number>> = {};
   for (const bg of [1, 2, 3]) {
-    boards.push((await loadBattlegroupBoard(db, bg, mode)).board);
-    if (mode === "bigThings") defenderNodes[bg] = await loadDefenderNodes(db, bg);
+    boards.push((await loadBattlegroupBoard(db, allianceId, bg, mode)).board);
+    if (mode === "bigThings") defenderNodes[bg] = await loadDefenderNodes(db, allianceId, bg);
   }
 
-  const allUserDocs = await db.collection("users").find().sort({ displayName: 1 }).toArray();
+  const allUserDocs = await db.collection("users").find({ allianceId }).sort({ displayName: 1 }).toArray();
   const allUsers = allUserDocs.map((user) => ({
     userId: user._id.toString(),
     username: user.username as string,
@@ -52,13 +51,12 @@ export default async function BattlegroupsPage({
 }: {
   searchParams: { bg?: string; view?: string };
 }) {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requirePageSession();
 
   let loaded: Awaited<ReturnType<typeof loadBoards>> | null = null;
   let dbError: string | null = null;
   try {
-    loaded = await loadBoards();
+    loaded = await loadBoards(session.alliance);
   } catch (err) {
     console.error("Battlegroups page failed to load:", err);
     dbError = err instanceof Error ? err.message : "Unexpected server error.";

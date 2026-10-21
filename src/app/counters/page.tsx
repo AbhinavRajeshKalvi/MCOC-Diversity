@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
-import { isOfficerRole } from "@/lib/auth";
+import { requirePageSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { loadCounterData } from "@/lib/counter-data";
 import AppShell from "@/components/AppShell";
@@ -11,8 +9,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function CountersPage({ searchParams }: { searchParams: { defender?: string } }) {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requirePageSession();
 
   let data: Awaited<ReturnType<typeof loadCounterData>> | null = null;
   let dbError: string | null = null;
@@ -36,7 +33,7 @@ export default async function CountersPage({ searchParams }: { searchParams: { d
         data && (
           <CounterFinder
             initialData={data}
-            isOfficer={isOfficerRole(session.role)}
+            isOfficer={session.gameDataEditor}
             initialDefenderId={searchParams.defender ?? null}
           />
         )

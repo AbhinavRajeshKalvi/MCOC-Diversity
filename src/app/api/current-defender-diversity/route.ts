@@ -19,7 +19,7 @@ const schema = z.object({
 export const POST = withErrorHandling(
   "POST /api/current-defender-diversity",
   async (req: NextRequest) => {
-    await requireOfficer();
+    const session = await requireOfficer();
 
     const parsed = schema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
@@ -28,9 +28,9 @@ export const POST = withErrorHandling(
 
     const { battlegroup } = parsed.data;
     const db = await getDb();
-    const mode = parsed.data.mode ?? (await getWarMode(db));
+    const mode = parsed.data.mode ?? (await getWarMode(db, session.alliance));
     // Replace the persisted current list with exactly the saved suggested plan.
-    const assigned = await publishSuggested(db, battlegroup, mode);
+    const assigned = await publishSuggested(db, session.alliance, battlegroup, mode);
     return NextResponse.json({ ok: true, battlegroup, assigned });
   }
 );

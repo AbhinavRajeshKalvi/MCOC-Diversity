@@ -5,9 +5,17 @@ import { getSession } from "@/lib/session";
 import { isOfficerRole } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/api-handler";
 
-// Members edit their own entries; officers, the Leader and the Admin can edit anyone's.
-function entryFilter(entryId: ObjectId, session: { userId: string; role: string }) {
-  return isOfficerRole(session.role) ? { _id: entryId } : { _id: entryId, userId: new ObjectId(session.userId) };
+// Members edit their own entries; officers, the Leader and the Admin can also
+// edit entries of anyone in their alliance.
+async function entryFilter(entryId: ObjectId, session: { userId: string; role: string; allianceId: string | null }) {
+  const own = new ObjectId(session.userId);
+  if (!isOfficerRole(session.role) || !session.allianceId) return { _id: entryId, userId: own };
+  const db = await getDb();
+  const members = await db
+    .collection("users")
+    .find({ allianceId: new ObjectId(session.allianceId) }, { projection: { _id: 1 } })
+    .toArray();
+  return { _id: entryId, userId: { $in: [own, ...members.map((member) => member._id)] } };
 }
 
 const schema = z.object({
@@ -43,7 +51,7 @@ export const PATCH = withErrorHandling(
 
     const db = await getDb();
     const result = await db.collection("rosterEntries").updateOne(
-      entryFilter(entryId, session),
+      await entryFilter(entryId, session),
       { $set: { ...parsed.data, updatedAt: new Date() } }
     );
 
@@ -66,7 +74,7 @@ export const DELETE = withErrorHandling(
     const db = await getDb();
     const result = await db
       .collection("rosterEntries")
-      .deleteOne(entryFilter(entryId, session));
+      .deleteOne(await entryFilter(entryId, session));
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Entry not found." }, { status: 404 });

@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { requirePageSession } from "@/lib/session";
 import { normalizeAscension } from "@/lib/ascension";
 import { getDb, ObjectId } from "@/lib/db";
 import AppShell from "@/components/AppShell";
@@ -46,8 +45,7 @@ async function loadProfileData(userId: string) {
 }
 
 export default async function ProfilePage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requirePageSession();
 
   let data: Awaited<ReturnType<typeof loadProfileData>> | null = null;
   let dbError: string | null = null;

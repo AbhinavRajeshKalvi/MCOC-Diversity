@@ -10,7 +10,8 @@
 // Big Things wars use a 10-node map of five two-node diamond islands: two rows
 // of two (1-2 and 3-4 at the bottom, 5-6 and 7-8 above them) and one island
 // (9-10) at the top centre, with a short bar marking each end of the map. It
-// has no attack paths; members pick every node for themselves.
+// has no attack paths. Members drag their own name onto a node (officers can
+// move anyone), each node holds one member and each member holds one node.
 
 import type { WarMode } from "./war-mode";
 
@@ -50,11 +51,25 @@ export function pathNodes(path: number): number[] {
 
 export type AttackMember = { userId: string; displayName: string };
 
+/** A champion from a member's roster, picked to attack a Big Things node. */
+export type AttackerChampion = {
+  championId: string;
+  name: string;
+  imageUrl: string | null;
+  stars: number | null;
+  rank: number | null;
+};
+
+/** How many attackers a member can pick for the Big Things node they hold. */
+export const ATTACKERS_PER_NODE = 2;
+
 export type AttackBoard = {
   battlegroup: 1 | 2 | 3;
   members: AttackMember[];
   /** Slot key to the member holding it. Empty slots are left out. */
   assignments: Partial<Record<AttackSlot, AttackMember>>;
+  /** Big Things only: slot key to the attackers its holder picked. */
+  attackers?: Partial<Record<AttackSlot, AttackerChampion[]>>;
 };
 
 // --- Drawing geometry (SVG user units) -------------------------------------

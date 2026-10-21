@@ -5,5 +5,6 @@ export default async function Home() {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.mustChangePassword) redirect("/account/password");
+  if (!session.allianceId) redirect("/alliance");
   redirect("/battlegroups");
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { REMOVED_CHAMPIONS, championKey, getDb, toObjectId } from "@/lib/db";
-import { requireOfficer } from "@/lib/session";
+import { requireGameDataEditor } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
 import { COUNTERS, COUNTER_PROFILES } from "@/lib/counters";
 
@@ -13,9 +13,9 @@ export const PATCH = withErrorHandling(
   "PATCH /api/champions/[id]",
   async (req: NextRequest, { params }: { params: { id: string } }) => {
     try {
-      await requireOfficer();
+      await requireGameDataEditor();
     } catch {
-      return NextResponse.json({ error: "Officers only." }, { status: 403 });
+      return NextResponse.json({ error: "Only game-data editors can change this." }, { status: 403 });
     }
 
     const championId = toObjectId(params.id);
@@ -42,9 +42,9 @@ export const DELETE = withErrorHandling(
   "DELETE /api/champions/[id]",
   async (_req: NextRequest, { params }: { params: { id: string } }) => {
     try {
-      await requireOfficer();
+      await requireGameDataEditor();
     } catch {
-      return NextResponse.json({ error: "Officers only." }, { status: 403 });
+      return NextResponse.json({ error: "Only game-data editors can change this." }, { status: 403 });
     }
 
     const championId = toObjectId(params.id);

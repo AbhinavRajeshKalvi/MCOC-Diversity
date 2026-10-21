@@ -98,6 +98,12 @@
   }
 }
 
+/* Inside the mobile app's web views the app's own tabs replace the web navigation. */
+html[data-embed] .app-chrome,
+html[data-embed] h1.page-title {
+  display: none !important;
+}
+
 .print-only-document {
   display: none;
 }

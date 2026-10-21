@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, toObjectId } from "@/lib/db";
-import { requireOfficer } from "@/lib/session";
+import { requireGameDataEditor } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
 import { COUNTERS, COUNTER_STRENGTHS } from "@/lib/counters";
 import { toCounter } from "@/lib/counter-data";
@@ -19,9 +19,9 @@ export const PATCH = withErrorHandling(
   async (req: NextRequest, { params }: { params: { id: string } }) => {
     let session;
     try {
-      session = await requireOfficer();
+      session = await requireGameDataEditor();
     } catch {
-      return NextResponse.json({ error: "Officers only." }, { status: 403 });
+      return NextResponse.json({ error: "Only game-data editors can change this." }, { status: 403 });
     }
 
     const id = toObjectId(params.id);
@@ -49,9 +49,9 @@ export const DELETE = withErrorHandling(
   "DELETE /api/counters/[id]",
   async (_req: NextRequest, { params }: { params: { id: string } }) => {
     try {
-      await requireOfficer();
+      await requireGameDataEditor();
     } catch {
-      return NextResponse.json({ error: "Officers only." }, { status: 403 });
+      return NextResponse.json({ error: "Only game-data editors can change this." }, { status: 403 });
     }
 
     const id = toObjectId(params.id);

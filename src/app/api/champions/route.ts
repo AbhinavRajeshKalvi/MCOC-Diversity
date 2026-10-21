@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { REMOVED_CHAMPIONS, championKey, getDb } from "@/lib/db";
-import { getSession, requireOfficer } from "@/lib/session";
+import { getSession, requireGameDataEditor } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
 
 export const GET = withErrorHandling("GET /api/champions", async () => {
@@ -26,9 +26,9 @@ const schema = z.object({
 
 export const POST = withErrorHandling("POST /api/champions", async (req: NextRequest) => {
   try {
-    await requireOfficer();
+    await requireGameDataEditor();
   } catch {
-    return NextResponse.json({ error: "Officers only." }, { status: 403 });
+    return NextResponse.json({ error: "Only game-data editors can change this." }, { status: 403 });
   }
 
   const parsed = schema.safeParse(await req.json().catch(() => null));

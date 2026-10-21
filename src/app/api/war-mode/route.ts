@@ -19,6 +19,6 @@ export const POST = withErrorHandling("POST /api/war-mode", async (req: NextRequ
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid war mode." }, { status: 400 });
 
-  await setWarMode(await getDb(), parsed.data.mode, session.userId);
+  await setWarMode(await getDb(), session.alliance, parsed.data.mode, session.userId);
   return NextResponse.json({ ok: true, mode: parsed.data.mode });
 });

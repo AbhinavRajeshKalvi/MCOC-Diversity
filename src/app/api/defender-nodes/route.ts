@@ -29,8 +29,8 @@ export const POST = withErrorHandling("POST /api/defender-nodes", async (req: Ne
   const { battlegroup, node, userId } = parsed.data;
 
   const db = await getDb();
-  const result = await setDefenderNode(db, { battlegroup, node, userId, actorId: session.userId });
+  const result = await setDefenderNode(db, { allianceId: session.alliance, battlegroup, node, userId, actorId: session.userId });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
 
-  return NextResponse.json({ ok: true, nodes: await loadDefenderNodes(db, battlegroup) });
+  return NextResponse.json({ ok: true, nodes: await loadDefenderNodes(db, session.alliance, battlegroup) });
 });

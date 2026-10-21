@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
@@ -16,7 +17,7 @@ export default function LoginForm() {
     setError(null);
     setLoading(true);
     let res: Response;
-    let data: { error?: string; mustChangePassword?: boolean };
+    let data: { error?: string; mustChangePassword?: boolean; user?: { allianceId: string | null } };
     try {
       res = await fetch("/api/auth/login", {
         method: "POST",
@@ -35,7 +36,7 @@ export default function LoginForm() {
       return;
     }
     // Leave the button in its loading state until the next page takes over.
-    router.push(data.mustChangePassword ? "/account/password" : "/battlegroups");
+    router.push(data.mustChangePassword ? "/account/password" : data.user?.allianceId ? "/battlegroups" : "/alliance");
     router.refresh();
   }
 
@@ -43,7 +44,7 @@ export default function LoginForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <label className="field-label" htmlFor="username">
-          Username
+          Username or email
         </label>
         <input
           id="username"
@@ -56,9 +57,14 @@ export default function LoginForm() {
         />
       </div>
       <div>
-        <label className="field-label" htmlFor="password">
-          Password
-        </label>
+        <div className="flex items-baseline justify-between">
+          <label className="field-label" htmlFor="password">
+            Password
+          </label>
+          <Link href="/forgot-password" className="text-[11px] text-brass hover:text-brass-bright">
+            Forgot password?
+          </Link>
+        </div>
         <input
           id="password"
           type="password"

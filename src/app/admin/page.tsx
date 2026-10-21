@@ -1,23 +1,16 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
-import { getDb } from "@/lib/db";
+import { requirePageSession } from "@/lib/session";
+import { getDb, type ObjectId } from "@/lib/db";
+import { listAllianceMembers } from "@/lib/members";
 import { isOfficerRole } from "@/lib/auth";
 import AppShell from "@/components/AppShell";
 import AdminPanel from "@/components/AdminPanel";
 import DbErrorNotice from "@/components/DbErrorNotice";
 
-async function loadAdminData() {
+async function loadAdminData(allianceId: ObjectId) {
   const db = await getDb();
 
-  const userDocs = await db.collection("users").find().sort({ displayName: 1 }).toArray();
-  const users = userDocs.map((u) => ({
-    id: u._id.toString(),
-    username: u.username as string,
-    displayName: u.displayName as string,
-    role: u.role as "admin" | "leader" | "officer" | "member",
-    battlegroup: (u.battlegroup as 1 | 2 | 3 | null) ?? null,
-    mustChangePassword: Boolean(u.mustChangePassword)
-  }));
+  const users = await listAllianceMembers(db, allianceId);
 
   const championDocs = await db.collection("champions").find().sort({ name: 1 }).toArray();
   const champions = championDocs.map((c) => ({
@@ -30,14 +23,13 @@ async function loadAdminData() {
 }
 
 export default async function AdminPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requirePageSession();
   if (!isOfficerRole(session.role)) redirect("/profile");
 
   let data: Awaited<ReturnType<typeof loadAdminData>> | null = null;
   let dbError: string | null = null;
   try {
-    data = await loadAdminData();
+    data = await loadAdminData(session.alliance);
   } catch (err) {
     console.error("Admin page failed to load:", err);
     dbError = err instanceof Error ? err.message : "Unexpected server error.";
@@ -47,7 +39,9 @@ export default async function AdminPage() {
     <AppShell session={session}>
       <h1 className="page-title">Admin</h1>
       <p className="page-lede">
-        Manage alliance members, battlegroup placement, and the champion list.
+        Manage your alliance&apos;s members, battlegroup placement and rosters.
+        {session.gameDataEditor && " You can also edit the champion list every alliance uses."} New members join with the
+        alliance code on the Alliance page.
       </p>
       {dbError ? (
         <DbErrorNotice message={dbError} />
@@ -57,6 +51,7 @@ export default async function AdminPage() {
             initialUsers={data.users}
             initialChampions={data.champions}
             viewer={{ userId: session.userId, role: session.role }}
+            canEditChampions={session.gameDataEditor}
           />
         )
       )}

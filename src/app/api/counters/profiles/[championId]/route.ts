@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, toObjectId } from "@/lib/db";
-import { requireOfficer } from "@/lib/session";
+import { requireGameDataEditor } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
 import { CHAMPION_CLASSES, COUNTER_PROFILES } from "@/lib/counters";
 import { toCounterProfile } from "@/lib/counter-data";
@@ -20,9 +20,9 @@ export const PUT = withErrorHandling(
   async (req: NextRequest, { params }: { params: { championId: string } }) => {
     let session;
     try {
-      session = await requireOfficer();
+      session = await requireGameDataEditor();
     } catch {
-      return NextResponse.json({ error: "Officers only." }, { status: 403 });
+      return NextResponse.json({ error: "Only game-data editors can change this." }, { status: 403 });
     }
 
     const championId = toObjectId(params.championId);

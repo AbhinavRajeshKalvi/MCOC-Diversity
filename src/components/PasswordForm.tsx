@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function PasswordForm({ forced }: { forced: boolean }) {
+export default function PasswordForm({ forced, hasPassword = true }: { forced: boolean; hasPassword?: boolean }) {
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -45,6 +45,7 @@ export default function PasswordForm({ forced }: { forced: boolean }) {
           You're using the default password. Set your own before continuing.
         </p>
       )}
+      {hasPassword && (
       <div>
         <label className="field-label" htmlFor="currentPassword">
           Current password
@@ -59,6 +60,7 @@ export default function PasswordForm({ forced }: { forced: boolean }) {
           required
         />
       </div>
+      )}
       <div>
         <label className="field-label" htmlFor="newPassword">
           New password

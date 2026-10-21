@@ -1,13 +1,13 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { requirePageSession } from "@/lib/session";
 import { isOfficerRole } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { getDb, type ObjectId } from "@/lib/db";
 import type { AttackBoard } from "@/lib/attack-map";
 import { loadAttackBoard } from "@/lib/attack-plans";
 import { getWarMode } from "@/lib/war-settings";
 import type { WarMode } from "@/lib/war-mode";
 import AppShell from "@/components/AppShell";
 import AttackMap from "@/components/AttackMap";
+import BigThingsAttackMap from "@/components/BigThingsAttackMap";
 import DbErrorNotice from "@/components/DbErrorNotice";
 import WarModeSwitch from "@/components/WarModeSwitch";
 
@@ -15,23 +15,23 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 async function loadAttack(
+  allianceId: ObjectId,
   userId: string
 ): Promise<{ mode: WarMode; boards: AttackBoard[]; myBattlegroup: number | null }> {
   const db = await getDb();
-  const mode = await getWarMode(db);
-  const boards = await Promise.all(([1, 2, 3] as const).map((bg) => loadAttackBoard(db, bg, mode)));
+  const mode = await getWarMode(db, allianceId);
+  const boards = await Promise.all(([1, 2, 3] as const).map((bg) => loadAttackBoard(db, allianceId, bg, mode)));
   const mine = boards.find((board) => board.members.some((member) => member.userId === userId));
   return { mode, boards, myBattlegroup: mine?.battlegroup ?? null };
 }
 
 export default async function AttackPage({ searchParams }: { searchParams: { bg?: string } }) {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  const session = await requirePageSession();
 
   let loaded: Awaited<ReturnType<typeof loadAttack>> | null = null;
   let dbError: string | null = null;
   try {
-    loaded = await loadAttack(session.userId);
+    loaded = await loadAttack(session.alliance, session.userId);
   } catch (err) {
     console.error("Attack page failed to load:", err);
     dbError = err instanceof Error ? err.message : "Unexpected server error.";
@@ -46,7 +46,7 @@ export default async function AttackPage({ searchParams }: { searchParams: { bg?
           <h1 className="page-title">Attack</h1>
           <p className="page-lede !mb-0">
             {loaded?.mode === "bigThings"
-              ? "Who attacks where in each battlegroup. The Big Things map has 10 nodes on five islands, and everyone can pick their own spots."
+              ? "Who attacks where in each battlegroup. The Big Things map has 10 nodes on five islands: drag your name onto a node, then tap it to pick your two attackers."
               : "Who attacks where in each battlegroup. Officers assign the nine attack paths; everyone can pick their own spot on the diamond islands and the boss island."}
           </p>
         </div>
@@ -55,7 +55,16 @@ export default async function AttackPage({ searchParams }: { searchParams: { bg?
       {dbError ? (
         <DbErrorNotice message={dbError} />
       ) : (
-        loaded && (
+        loaded &&
+        (loaded.mode === "bigThings" ? (
+          <BigThingsAttackMap
+            key={loaded.mode}
+            boards={loaded.boards}
+            viewerId={session.userId}
+            isOfficer={isOfficer}
+            initialBattlegroup={Number(searchParams.bg) || loaded.myBattlegroup || 1}
+          />
+        ) : (
           <AttackMap
             // Remount on a mode switch so the new map fades in fresh.
             key={loaded.mode}
@@ -65,7 +74,7 @@ export default async function AttackPage({ searchParams }: { searchParams: { bg?
             isOfficer={isOfficer}
             initialBattlegroup={Number(searchParams.bg) || loaded.myBattlegroup || 1}
           />
-        )
+        ))
       )}
     </AppShell>
   );

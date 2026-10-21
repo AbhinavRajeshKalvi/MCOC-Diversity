@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Crosshair, KeyRound, Loader2, LogOut, Menu, Shield, Swords, Users, UserCog, X, type LucideIcon } from "lucide-react";
+import { CircleUser, Crosshair, Flag, Loader2, LogOut, Menu, MessagesSquare, Shield, Swords, Users, UserCog, X, type LucideIcon } from "lucide-react";
 import { isOfficerRole, type Role } from "@/lib/roles";
+import FloatingChat from "./FloatingChat";
 
 type NavSession = {
+  userId: string;
   displayName: string;
   role: Role;
+  allianceId?: string | null;
 };
 
 type NavItem = { href: string; label: string; icon: LucideIcon; accent: string };
@@ -18,7 +21,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/battlegroups", label: "Battlegroups", icon: Users, accent: "#38BDF8" },
   { href: "/attack", label: "Attack", icon: Crosshair, accent: "#FACC15" },
   { href: "/counters", label: "Counters", icon: Swords, accent: "#F87171" },
-  { href: "/profile", label: "My Roster", icon: Shield, accent: "#4ADE80" }
+  { href: "/profile", label: "My Roster", icon: Shield, accent: "#4ADE80" },
+  { href: "/alliance", label: "Alliance", icon: Flag, accent: "#60A5FA" },
+  { href: "/chat", label: "Chat", icon: MessagesSquare, accent: "#4FD1A9" }
 ];
 const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin", icon: UserCog, accent: "#C084FC" };
 
@@ -78,7 +83,7 @@ export default function AppShell({
 
   const items = isOfficerRole(session.role) ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
   const pendingLabel = pendingHref
-    ? items.find((item) => item.href === pendingHref)?.label ?? (pendingHref === "/account/password" ? "Change password" : "page")
+    ? items.find((item) => item.href === pendingHref)?.label ?? (pendingHref === "/account" ? "Account" : "page")
     : null;
   const currentItem = items.find((item) => pathname.startsWith(item.href));
   const initials = session.displayName
@@ -158,12 +163,12 @@ export default function AppShell({
           </div>
           <div className="flex flex-col gap-1">
             <Link
-              href="/account/password"
-              onClick={(event) => startNavigation(event, "/account/password")}
+              href="/account"
+              onClick={(event) => startNavigation(event, "/account")}
               className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-parchment-dim hover:text-brass-bright hover:bg-white/[0.04]"
             >
-              <KeyRound size={13} aria-hidden />
-              Change password
+              <CircleUser size={13} aria-hidden />
+              Account
             </Link>
             <button
               onClick={logout}
@@ -185,7 +190,7 @@ export default function AppShell({
           <div className="h-full w-1/3 bg-brass-bright animate-[nav-progress_1.1s_ease-in-out_infinite]" />
         </div>
       )}
-      <header className="md:hidden sticky top-0 z-40 flex items-center gap-3 px-4 h-14 border-b border-ink-line/80 bg-ink-panel/95 backdrop-blur">
+      <header className="app-chrome md:hidden sticky top-0 z-40 flex items-center gap-3 px-4 h-14 border-b border-ink-line/80 bg-ink-panel/95 backdrop-blur">
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
@@ -207,7 +212,7 @@ export default function AppShell({
         )}
       </header>
       {menuOpen && (
-        <div className="md:hidden fixed inset-0 z-50" id="mobile-menu" role="dialog" aria-modal="true" aria-label="Menu">
+        <div className="app-chrome md:hidden fixed inset-0 z-50" id="mobile-menu" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] overflow-y-auto flex flex-col border-r border-ink-line/80 bg-gradient-to-b from-ink-raised via-ink-panel to-ink shadow-2xl">
             <button
@@ -222,10 +227,10 @@ export default function AppShell({
           </aside>
         </div>
       )}
-      <aside className="hidden md:flex w-60 shrink-0 sticky top-0 h-screen flex-col border-r border-ink-line/80 bg-gradient-to-b from-ink-raised/80 via-ink-panel/90 to-ink/95 shadow-[8px_0_30px_-20px_rgba(0,0,0,0.8)]">
+      <aside className="app-chrome hidden md:flex w-60 shrink-0 sticky top-0 h-screen flex-col border-r border-ink-line/80 bg-gradient-to-b from-ink-raised/80 via-ink-panel/90 to-ink/95 shadow-[8px_0_30px_-20px_rgba(0,0,0,0.8)]">
         {sidebar}
       </aside>
-      <main className="relative flex-1 min-w-0 px-4 py-5 sm:p-5 md:p-8 lg:p-10 max-w-7xl" aria-busy={Boolean(pendingHref)}>
+      <main className="relative flex-1 min-w-0 px-4 py-5 sm:p-5 md:p-8 lg:p-10 !pb-24 max-w-7xl" aria-busy={Boolean(pendingHref)}>
         {pendingHref && (
           <div className="absolute inset-0 z-40 flex items-start justify-center bg-ink/60 backdrop-blur-[2px] pt-24">
             <div className="flex items-center gap-3 panel px-4 py-3 text-sm text-parchment">
@@ -236,6 +241,7 @@ export default function AppShell({
         )}
         {children}
       </main>
+      {session.allianceId && <FloatingChat viewer={{ userId: session.userId, role: session.role }} />}
     </div>
   );
 }
