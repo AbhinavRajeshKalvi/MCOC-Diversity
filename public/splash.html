@@ -26,9 +26,9 @@
 <p id="note">Loading War Room…</p>
 <script>
 // Shown by the service worker when the server is slow to answer. It asks for
-// the real page straight away; a browser keeps showing the current page (this
-// one) until the new page's response arrives, so this stays up for the whole
-// wait. The "__s" flag tells the service worker not to show this screen again.
+// the real page and stays on screen until it arrives (a browser keeps showing
+// the current page until the new page's response comes in). The "__s" flag
+// tells the service worker not to show this screen again.
 (function () {
   var target = new URLSearchParams(location.search).get("to") || "/";
   if (target.charAt(0) !== "/" || target.slice(0, 2) === "//") target = "/";
@@ -36,7 +36,52 @@
   url.searchParams.set("__s", "1");
   var note = document.getElementById("note");
   setTimeout(function () { note.textContent = "Still loading, hang tight…"; }, 8000);
-  location.replace(url.pathname + url.search + url.hash);
+
+  function go() { location.replace(url.pathname + url.search + url.hash); }
+  var sw = navigator.serviceWorker;
+  if (!sw) return go();
+
+  // An older copy of the service worker doesn't know about "__s" and would show
+  // this screen again and again. So first make sure the newest one is running,
+  // and if this keeps repeating, remove the service worker altogether.
+  var seen = 0;
+  try {
+    var last = JSON.parse(sessionStorage.getItem("wr-splash") || "{}");
+    seen = Date.now() - (last.t || 0) < 60000 ? (last.n || 0) + 1 : 1;
+    sessionStorage.setItem("wr-splash", JSON.stringify({ n: seen, t: Date.now() }));
+  } catch (e) {}
+
+  function withTimeout(promise, ms) {
+    return Promise.race([promise, new Promise(function (resolve) { setTimeout(resolve, ms); })]);
+  }
+
+  if (seen >= 3) {
+    withTimeout(
+      sw.getRegistrations().then(function (regs) {
+        return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+      }).then(function () {
+        return window.caches ? caches.keys().then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); }) : null;
+      }),
+      4000
+    ).then(go, go);
+    return;
+  }
+
+  withTimeout(
+    sw.getRegistration("/").then(function (reg) {
+      if (!reg) return;
+      return reg.update().then(function () {
+        var worker = reg.installing || reg.waiting;
+        if (!worker || worker.state === "activated") return;
+        return new Promise(function (resolve) {
+          worker.addEventListener("statechange", function () {
+            if (worker.state === "activated" || worker.state === "redundant") resolve();
+          });
+        });
+      });
+    }).catch(function () {}),
+    6000
+  ).then(go, go);
 })();
 </script>
 </body>
