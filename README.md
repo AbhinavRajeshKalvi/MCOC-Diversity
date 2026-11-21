@@ -73,3 +73,13 @@ Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (see `.env.examp
 - Tapping a node someone else booked shows who has it and their champion, and **Ask for this node** (optionally with the champion you'd use). The holder sees the request at the top of the Attack page and in the node, and can **Hand it over** or **Keep it**. A request lapses if the node changes hands some other way.
 - Nodes 37-50 (and open requests) clear every 48 hours at 3:00 AM IST, when a new war starts. The first clear is 23 Nov 2026 03:00 IST; the schedule is `src/lib/attack-reset.ts`. There's no cron job: bookings from before the latest clear are removed the next time the map is loaded or changed, so it's on time even if the server was asleep. Paths are not cleared.
 - Requests live in `attackTakeoverRequests` (index created on start). Bookings keep the chosen champion in `attackAssignments.championId`.
+
+## Fast launch of the home-screen app
+
+A free Render web service goes to sleep after about 15 minutes without traffic and takes several seconds to wake (the server starts, then connects to MongoDB and runs its start-up work). The installed app used to show a blank dark screen for that whole time.
+
+- The service worker (`public/sw.js`) now races every page open against a 0.6 second timer. If the server hasn't answered, a cached launch screen (`public/splash.html`, logo plus a progress bar) is shown instantly. It keeps asking the server and switches to the real page the moment it answers. When the server is awake you never see it. Build output under `/_next/static` and the icons are also cached, so repeat opens load faster.
+- iPhones show a launch image while a home-screen app starts. They're generated into `public/splash` (`node scripts/generate-icons.mjs`) for current iPhone sizes, so the logo appears instead of black.
+- To avoid the wait altogether, keep the server awake: point a free uptime monitor (UptimeRobot, cron-job.org) at `https://<your-domain>/api/health?warm=1` every 5 minutes. `?warm=1` also connects to MongoDB so the first real visit is fast. A paid Render instance never sleeps.
+
+After deploying, installed apps pick up the new service worker the next time they're opened (open the app twice).
