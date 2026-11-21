@@ -26,7 +26,8 @@ const prefsSchema = z
     chat: z.boolean(),
     booking: z.boolean(),
     takeover: z.boolean(),
-    roster: z.boolean()
+    roster: z.boolean(),
+    members: z.boolean()
   })
   .partial();
 

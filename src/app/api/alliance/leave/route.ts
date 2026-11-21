@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
 import { loadAllianceFor, toPublicUser } from "@/lib/accounts";
 import { leaveAlliance } from "@/lib/alliances";
+import { notifyMemberLeft } from "@/lib/member-notify";
 
 export const POST = withErrorHandling("POST /api/alliance/leave", async () => {
   const session = await getSession();
@@ -15,6 +16,9 @@ export const POST = withErrorHandling("POST /api/alliance/leave", async () => {
 
   const result = await leaveAlliance(db, user);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 409 });
+  if (!result.allianceDeleted && user.allianceId) {
+    notifyMemberLeft(db, user.allianceId as ObjectId, { id: user._id, name: user.displayName as string });
+  }
 
   const updated = await users.findOne({ _id: user._id });
   return NextResponse.json({

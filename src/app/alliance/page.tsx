@@ -36,11 +36,11 @@ export default async function AlliancePage() {
       <h1 className="page-title">Alliance</h1>
       <p className="page-lede">
         {isOfficerRole(session.role)
-          ? "Your alliance's name, join code and members. Manage members on the Admin page."
+          ? "Your alliance's name, join code and members. Remove members here, or change roles and battlegroups on the Admin page."
           : "Your alliance and everyone in it. Ask an officer to change your battlegroup or role."}
       </p>
       <AlliancePanel alliance={alliance} role={session.role}>
-        <AllianceMemberList members={members} viewerId={session.userId} />
+        <AllianceMemberList members={members} viewerId={session.userId} viewerRole={session.role} />
       </AlliancePanel>
     </AppShell>
   );
