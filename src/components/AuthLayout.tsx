@@ -1,3 +1,5 @@
+import BrandMark from "./BrandMark";
+
 // The centered brand header and panel shared by the sign-in, sign-up and
 // password-reset pages.
 export default function AuthLayout({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) {
@@ -5,8 +7,8 @@ export default function AuthLayout({ children, footer }: { children: React.React
     <div className="min-h-screen flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="brand-mark fx-logo-stamp h-14 w-14 text-2xl mb-4" aria-hidden>
-            WR
+          <div className="fx-logo-stamp h-16 w-16 mb-4 rounded-[22%] shadow-glow">
+            <BrandMark className="h-full w-full" />
           </div>
           <div
             className="fx-rise font-display text-5xl font-bold uppercase tracking-wider leading-none bg-gradient-to-r from-brass-bright via-brass to-crimson-bright bg-clip-text text-transparent"

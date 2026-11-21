@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { isOfficerRole } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/api-handler";
 import { normalizeAscension } from "@/lib/ascension";
+import { notifyRosterUpdated } from "@/lib/roster-notify";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -128,6 +129,7 @@ export const POST = withErrorHandling("POST /api/roster", async (req: NextReques
     },
     { upsert: true }
   );
+  await notifyRosterUpdated(db, owner.userId, session.userId);
 
   return NextResponse.json({ ok: true });
 });

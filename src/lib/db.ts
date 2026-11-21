@@ -183,6 +183,8 @@ async function initialize(db: Db): Promise<void> {
     // One member per attack path or upper-island node, per battlegroup.
     db.collection("attackAssignments").createIndex({ ...byAllianceBg, slot: 1 }, { unique: true }),
     db.collection("bigThingsAttackAssignments").createIndex({ ...byAllianceBg, slot: 1 }, { unique: true }),
+    // One open takeover request per player per node.
+    db.collection("attackTakeoverRequests").createIndex({ ...byAllianceBg, slot: 1, requesterId: 1 }, { unique: true }),
     // Big Things defender placement: one member per node, one node per member.
     db.collection("bigThingsDefenderNodes").createIndex({ ...byAllianceBg, node: 1 }, { unique: true }),
     db.collection("bigThingsDefenderNodes").createIndex({ ...byAllianceBg, userId: 1 }, { unique: true }),

@@ -44,6 +44,12 @@ export function isPathSlot(slot: string): boolean {
   return slot.startsWith("path-");
 }
 
+/** A regular-map node members book for themselves (37-50). */
+export function isUpperNodeSlot(slot: string): boolean {
+  const node = /^node-(\d+)$/.exec(slot);
+  return Boolean(node && UPPER_NODES.includes(Number(node[1])));
+}
+
 /** The four nodes of an attack path, bottom to top. */
 export function pathNodes(path: number): number[] {
   return [0, 1, 2, 3].map((row) => row * PATH_COUNT + path);
@@ -63,6 +69,18 @@ export type AttackerChampion = {
 /** How many attackers a member can pick for the Big Things node they hold. */
 export const ATTACKERS_PER_NODE = 2;
 
+/** A request to take over a booked regular-map node from the member holding it. */
+export type TakeoverRequest = {
+  id: string;
+  slot: AttackSlot;
+  requester: AttackMember;
+  /** The member holding the node when the request was made. */
+  holderId: string;
+  /** The champion the requester would use there, if they picked one. */
+  champion: AttackerChampion | null;
+  createdAt: string;
+};
+
 export type AttackBoard = {
   battlegroup: 1 | 2 | 3;
   members: AttackMember[];
@@ -70,6 +88,10 @@ export type AttackBoard = {
   assignments: Partial<Record<AttackSlot, AttackMember>>;
   /** Big Things only: slot key to the attackers its holder picked. */
   attackers?: Partial<Record<AttackSlot, AttackerChampion[]>>;
+  /** Regular only: the champion a booked node's holder said they'd use. */
+  champions?: Partial<Record<AttackSlot, AttackerChampion>>;
+  /** Regular only: open requests to take over booked nodes. */
+  requests?: TakeoverRequest[];
 };
 
 // --- Drawing geometry (SVG user units) -------------------------------------

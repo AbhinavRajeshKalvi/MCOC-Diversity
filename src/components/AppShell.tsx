@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { CircleUser, Crosshair, Flag, Loader2, LogOut, Menu, MessagesSquare, Shield, Swords, Users, UserCog, X, type LucideIcon } from "lucide-react";
 import { isOfficerRole, type Role } from "@/lib/roles";
 import FloatingChat from "./FloatingChat";
+import BrandMark from "./BrandMark";
 
 type NavSession = {
   userId: string;
@@ -96,9 +97,7 @@ export default function AppShell({
   const sidebar = (
     <>
       <div className="p-5 pr-14 md:pr-5 flex items-center gap-3">
-        <div className="brand-mark h-10 w-10 text-xl shrink-0" aria-hidden>
-          WR
-        </div>
+        <BrandMark className="h-10 w-10" />
         <div className="min-w-0">
           <div className="font-display text-2xl font-bold uppercase tracking-wider leading-none bg-gradient-to-r from-brass-bright via-brass-bright to-orange-500 bg-clip-text text-transparent">
             War Room
@@ -201,9 +200,7 @@ export default function AppShell({
         >
           <Menu size={22} />
         </button>
-        <div className="brand-mark h-8 w-8 text-base shrink-0" aria-hidden>
-          WR
-        </div>
+        <BrandMark className="h-8 w-8" />
         <div className="font-display text-xl font-bold uppercase tracking-wider leading-none whitespace-nowrap bg-gradient-to-r from-brass-bright via-brass-bright to-orange-500 bg-clip-text text-transparent">
           War Room
         </div>

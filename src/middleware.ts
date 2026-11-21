@@ -47,7 +47,11 @@ async function route(req: NextRequest): Promise<NextResponse> {
   if (
     PUBLIC_PATHS.includes(pathname) ||
     pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico"
+    pathname === "/favicon.ico" ||
+    // The home-screen app's manifest, icons and service worker.
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js" ||
+    pathname.startsWith("/icons/")
   ) {
     return NextResponse.next();
   }
