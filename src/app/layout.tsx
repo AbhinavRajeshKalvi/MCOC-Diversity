@@ -13,6 +13,13 @@ const display = Barlow_Condensed({
 const body = Inter({ subsets: ["latin"], variable: "--font-body" });
 const stat = JetBrains_Mono({ subsets: ["latin"], variable: "--font-stat" });
 
+// iPhone launch images (made by scripts/generate-icons.mjs): the logo on the
+// app's background, shown while the home-screen app starts instead of a blank screen.
+const LAUNCH_SIZES: [number, number, number][] = [
+  [430, 932, 3], [393, 852, 3], [428, 926, 3], [390, 844, 3], [375, 812, 3],
+  [414, 896, 3], [414, 896, 2], [414, 736, 3], [375, 667, 2], [360, 780, 3]
+];
+
 export const metadata: Metadata = {
   title: "War Room — Alliance Diversity Planner",
   description: "Roster and defender-diversity planning for Alliance Wars.",
@@ -25,7 +32,15 @@ export const metadata: Metadata = {
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }]
   },
   // Home-screen installs on iPhone open full screen, like an app.
-  appleWebApp: { capable: true, title: "War Room", statusBarStyle: "black" }
+  appleWebApp: {
+    capable: true,
+    title: "War Room",
+    statusBarStyle: "black",
+    startupImage: LAUNCH_SIZES.map(([width, height, ratio]) => ({
+      url: `/splash/launch-${width * ratio}x${height * ratio}.png`,
+      media: `(device-width: ${width}px) and (device-height: ${height}px) and (-webkit-device-pixel-ratio: ${ratio}) and (orientation: portrait)`
+    }))
+  }
 };
 
 export const viewport: Viewport = {

@@ -51,6 +51,8 @@ async function route(req: NextRequest): Promise<NextResponse> {
     // The home-screen app's manifest, icons and service worker.
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
+    pathname === "/splash.html" ||
+    pathname.startsWith("/splash/") ||
     pathname.startsWith("/icons/")
   ) {
     return NextResponse.next();
