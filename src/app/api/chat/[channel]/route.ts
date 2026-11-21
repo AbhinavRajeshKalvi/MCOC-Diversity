@@ -5,7 +5,8 @@ import { requireAlliance } from "@/lib/session";
 import { withErrorHandling } from "@/lib/api-handler";
 import { allowRequest } from "@/lib/rate-limit";
 import { CHAT_COLLECTION, listChatMessages, loadChatMember, memberCanUse, publishChatEvent, toChatMessage } from "@/lib/chat";
-import { MAX_CHAT_MESSAGE_LENGTH, isChatChannel, type ChatChannel } from "@/lib/chat-channels";
+import { CHAT_CHANNEL_LABELS, MAX_CHAT_MESSAGE_LENGTH, canUseChannel, isChatChannel, type ChatChannel } from "@/lib/chat-channels";
+import { notifyAllianceMembers, truncate } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -70,5 +71,20 @@ export const POST = withErrorHandling("POST /api/chat", async (req: NextRequest,
   const result = await access.db.collection(CHAT_COLLECTION).insertOne(doc);
   const message = toChatMessage({ ...doc, _id: result.insertedId });
   await publishChatEvent({ type: "message", allianceId: access.session.allianceId, message });
+  notifyAllianceMembers(
+    access.db,
+    "chat",
+    {
+      allianceId: access.member.allianceId,
+      exclude: [access.session.userId],
+      include: (user) => canUseChannel({ role: user.role, battlegroup: user.battlegroup }, access.channel)
+    },
+    {
+      title: `${access.member.displayName} · ${CHAT_CHANNEL_LABELS[access.channel]} chat`,
+      body: truncate(parsed.data.text),
+      url: `/chat?c=${access.channel}`,
+      tag: `chat-${access.channel}`
+    }
+  );
   return NextResponse.json({ message }, { status: 201 });
 });

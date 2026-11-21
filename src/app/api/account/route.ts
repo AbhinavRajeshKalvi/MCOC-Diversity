@@ -67,6 +67,8 @@ export const DELETE = withErrorHandling("DELETE /api/account", async (req: NextR
   await db.collection("rosterEntries").deleteMany({ userId: user._id });
   await db.collection("passwordResets").deleteMany({ userId: user._id });
   await db.collection("chatMessages").deleteMany({ userId: user._id });
+  await db.collection("pushSubscriptions").deleteMany({ userId: user._id });
+  await db.collection("attackTakeoverRequests").deleteMany({ $or: [{ requesterId: user._id }, { holderId: user._id }] });
   await users.deleteOne({ _id: user._id });
   return clearSessionCookies(NextResponse.json({ ok: true }));
 });

@@ -16,7 +16,7 @@ export default async function AccountPage() {
   return (
     <AppShell session={session}>
       <h1 className="page-title">Account</h1>
-      <p className="page-lede">Your name, email and password.</p>
+      <p className="page-lede">Your name, email, password and notifications.</p>
       <AccountPanel
         account={{
           username: user.username,

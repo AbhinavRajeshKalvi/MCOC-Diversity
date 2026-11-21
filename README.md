@@ -57,3 +57,19 @@ The **Chat** page (and the app's Chat tab) has one realtime chat for the whole a
 **How it's realtime.** No extra service is needed. The server streams each open chat to the browser or app as Server-Sent Events (`GET /api/chat/<channel>/stream`), which works on Render's normal web service. To learn about new messages, the server follows a MongoDB change stream on `chatMessages`, so it works even with several server instances. MongoDB Atlas always supports change streams. A plain local `mongod` (not a replica set) doesn't, and then the server relays messages within its own process, which is fine for one server. When a connection drops, the client reconnects and catches up from the last message it had.
 
 API: `GET /api/chat/<channel>` (latest 50, `?before=<id>` for older), `POST /api/chat/<channel>` `{ text }`, `DELETE /api/chat/<channel>/<id>`. Channels are `alliance`, `bg1`, `bg2`, `bg3`.
+
+## Home-screen app and notifications
+
+The site is an installable web app: on Android, Chrome offers **Install app** (or menu > Add to Home screen); on iPhone, Safari's **Share > Add to Home Screen**. It opens full screen with the War Room shield icon. The icons in `public/icons` are drawn by `node scripts/generate-icons.mjs`, and `src/components/BrandMark.tsx` draws the same logo in the app.
+
+**Account > Notifications** has four switches, all off until the member turns them on: chat messages (any chat they can use), node bookings (their battlegroup; officers hear about every battlegroup), node requests (someone asks for a node they booked, or answers their request), and roster updates (anyone in the alliance; at most one per member every 30 minutes). Turning the first one on asks for notification permission on that device. Settings belong to the account; each device that should ring needs its permission granted once (the page offers **Turn on for this device**). iPhones only allow notifications once War Room has been added to the Home Screen and opened from there (iOS 16.4 or later). The Android app's built-in pages can't receive web push.
+
+Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (see `.env.example`). Subscriptions are stored in `pushSubscriptions` and the switches in `users.notifications`; both are created as needed, so there is no migration.
+
+## Booking attack nodes (regular wars)
+
+- Officers, the Leader and the Admin drag names from the player list onto the nine paths (any node of a path) and onto nodes 37-50, like the Big Things map. Dragging a name off the map clears it.
+- Members see only the map. Tapping one of nodes 37-50 books it, optionally with a champion from their roster. Nodes 1-36 are the paths, which only officers assign.
+- Tapping a node someone else booked shows who has it and their champion, and **Ask for this node** (optionally with the champion you'd use). The holder sees the request at the top of the Attack page and in the node, and can **Hand it over** or **Keep it**. A request lapses if the node changes hands some other way.
+- Nodes 37-50 (and open requests) clear every 48 hours at 3:00 AM IST, when a new war starts. The first clear is 23 Nov 2026 03:00 IST; the schedule is `src/lib/attack-reset.ts`. There's no cron job: bookings from before the latest clear are removed the next time the map is loaded or changed, so it's on time even if the server was asleep. Paths are not cleared.
+- Requests live in `attackTakeoverRequests` (index created on start). Bookings keep the chosen champion in `attackAssignments.championId`.

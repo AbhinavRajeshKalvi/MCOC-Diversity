@@ -4,6 +4,7 @@ import { getDb, type ObjectId } from "@/lib/db";
 import type { AttackBoard } from "@/lib/attack-map";
 import { loadAttackBoard } from "@/lib/attack-plans";
 import { getWarMode } from "@/lib/war-settings";
+import { formatIst, nextAttackReset } from "@/lib/attack-reset";
 import type { WarMode } from "@/lib/war-mode";
 import AppShell from "@/components/AppShell";
 import AttackMap from "@/components/AttackMap";
@@ -25,7 +26,7 @@ async function loadAttack(
   return { mode, boards, myBattlegroup: mine?.battlegroup ?? null };
 }
 
-export default async function AttackPage({ searchParams }: { searchParams: { bg?: string } }) {
+export default async function AttackPage({ searchParams }: { searchParams: { bg?: string; node?: string } }) {
   const session = await requirePageSession();
 
   let loaded: Awaited<ReturnType<typeof loadAttack>> | null = null;
@@ -47,7 +48,9 @@ export default async function AttackPage({ searchParams }: { searchParams: { bg?
           <p className="page-lede !mb-0">
             {loaded?.mode === "bigThings"
               ? "Who attacks where in each battlegroup. The Big Things map has 10 nodes on five islands: drag your name onto a node, then tap it to pick your two attackers."
-              : "Who attacks where in each battlegroup. Officers assign the nine attack paths; everyone can pick their own spot on the diamond islands and the boss island."}
+              : isOfficer
+                ? "Who attacks where in each battlegroup. Drag players onto the nine attack paths and nodes 37-50; members book nodes 37-50 themselves."
+                : "Who attacks where in each battlegroup. Officers assign the nine attack paths. Tap a node from 37 to 50 to book it, or to ask for one someone else booked."}
           </p>
         </div>
         {loaded && <WarModeSwitch mode={loaded.mode} isOfficer={isOfficer} />}
@@ -68,11 +71,12 @@ export default async function AttackPage({ searchParams }: { searchParams: { bg?
           <AttackMap
             // Remount on a mode switch so the new map fades in fresh.
             key={loaded.mode}
-            mode={loaded.mode}
             boards={loaded.boards}
             viewerId={session.userId}
             isOfficer={isOfficer}
             initialBattlegroup={Number(searchParams.bg) || loaded.myBattlegroup || 1}
+            initialNode={Number(searchParams.node) || null}
+            nextReset={formatIst(nextAttackReset())}
           />
         ))
       )}

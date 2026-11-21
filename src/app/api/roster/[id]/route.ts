@@ -4,6 +4,7 @@ import { getDb, ObjectId, toObjectId } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { isOfficerRole } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/api-handler";
+import { notifyRosterUpdated } from "@/lib/roster-notify";
 
 // Members edit their own entries; officers, the Leader and the Admin can also
 // edit entries of anyone in their alliance.
@@ -50,14 +51,16 @@ export const PATCH = withErrorHandling(
     }
 
     const db = await getDb();
-    const result = await db.collection("rosterEntries").updateOne(
+    const entry = await db.collection("rosterEntries").findOneAndUpdate(
       await entryFilter(entryId, session),
-      { $set: { ...parsed.data, updatedAt: new Date() } }
+      { $set: { ...parsed.data, updatedAt: new Date() } },
+      { projection: { userId: 1 } }
     );
 
-    if (result.matchedCount === 0) {
+    if (!entry) {
       return NextResponse.json({ error: "Entry not found." }, { status: 404 });
     }
+    await notifyRosterUpdated(db, entry.userId as ObjectId, session.userId);
     return NextResponse.json({ ok: true });
   }
 );
@@ -72,13 +75,14 @@ export const DELETE = withErrorHandling(
     if (!entryId) return NextResponse.json({ error: "Entry not found." }, { status: 404 });
 
     const db = await getDb();
-    const result = await db
+    const entry = await db
       .collection("rosterEntries")
-      .deleteOne(await entryFilter(entryId, session));
+      .findOneAndDelete(await entryFilter(entryId, session), { projection: { userId: 1 } });
 
-    if (result.deletedCount === 0) {
+    if (!entry) {
       return NextResponse.json({ error: "Entry not found." }, { status: 404 });
     }
+    await notifyRosterUpdated(db, entry.userId as ObjectId, session.userId);
     return NextResponse.json({ ok: true });
   }
 );

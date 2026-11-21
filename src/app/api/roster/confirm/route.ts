@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { SCREENSHOT_IMPORT_ENABLED } from "@/lib/features";
 import { withErrorHandling } from "@/lib/api-handler";
 import { normalizeAscension } from "@/lib/ascension";
+import { notifyRosterUpdated } from "@/lib/roster-notify";
 
 const championSchema = z.object({
   championId: z.string().min(1),
@@ -72,6 +73,7 @@ export const POST = withErrorHandling("POST /api/roster/confirm", async (req: Ne
   }
 
   await db.collection("rosterEntries").bulkWrite(operations, { ordered: false });
+  await notifyRosterUpdated(db, userId, session.userId);
 
   // Verify the records are actually readable immediately after the write.
   // This makes the import response fail loudly instead of allowing the UI to
