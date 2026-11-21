@@ -4,10 +4,10 @@
 // The server can be slow to answer after it has been idle, and the installed
 // app would otherwise sit on a blank screen. So opening a page races the
 // server against a short timer: if the server hasn't answered by then, a
-// cached launch screen (/splash.html) is shown right away. It keeps asking for
-// the real page and switches to it as soon as the server is ready.
+// cached launch screen (/splash.html) is shown right away. It asks for the
+// real page and stays on screen until the server answers.
 // Bump this when the files below change.
-const CACHE = "warroom-shell-v1";
+const CACHE = "warroom-shell-v2";
 const SHELL = ["/splash.html", "/icons/icon-192.png"];
 const SPLASH_AFTER_MS = 600;
 
@@ -45,7 +45,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.mode === "navigate" && !url.pathname.startsWith("/api/") && url.pathname !== "/splash.html") {
+  // "__s" marks a page opened from the launch screen itself: don't show it again.
+  if (
+    request.mode === "navigate" &&
+    !url.searchParams.has("__s") &&
+    !url.pathname.startsWith("/api/") &&
+    url.pathname !== "/splash.html"
+  ) {
     event.respondWith(
       (async () => {
         const network = fetch(request);

@@ -23,31 +23,20 @@
 <img src="/icons/icon-192.png" alt="" width="96" height="96">
 <h1>War Room</h1>
 <div class="bar"><i></i></div>
-<p id="note">Waking up the server…</p>
+<p id="note">Loading War Room…</p>
 <script>
-// Shown by the service worker when the server is slow to answer (a sleeping
-// host can take many seconds). It keeps asking for the real page and swaps to
-// it as soon as it's ready.
+// Shown by the service worker when the server is slow to answer. It asks for
+// the real page straight away; a browser keeps showing the current page (this
+// one) until the new page's response arrives, so this stays up for the whole
+// wait. The "__s" flag tells the service worker not to show this screen again.
 (function () {
   var target = new URLSearchParams(location.search).get("to") || "/";
   if (target.charAt(0) !== "/" || target.slice(0, 2) === "//") target = "/";
-  var started = Date.now();
+  var url = new URL(target, location.origin);
+  url.searchParams.set("__s", "1");
   var note = document.getElementById("note");
-  function go() { location.replace(target); }
-  function attempt() {
-    fetch(target, { headers: { "x-splash-probe": "1" }, credentials: "same-origin", redirect: "manual", cache: "no-store" })
-      .then(function (res) {
-        // 0 = an opaque redirect (e.g. to the sign-in page); that's still the server answering.
-        if (res.type === "opaqueredirect" || (res.status > 0 && res.status < 500)) return go();
-        retry();
-      })
-      .catch(retry);
-  }
-  function retry() {
-    if (Date.now() - started > 15000) note.textContent = "Still starting up, hang tight…";
-    setTimeout(attempt, 1500);
-  }
-  attempt();
+  setTimeout(function () { note.textContent = "Still loading, hang tight…"; }, 8000);
+  location.replace(url.pathname + url.search + url.hash);
 })();
 </script>
 </body>
