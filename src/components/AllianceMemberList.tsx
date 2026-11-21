@@ -33,7 +33,7 @@ function canRemove(viewerRole: Role, viewerId: string, member: AllianceMember): 
   return false;
 }
 
-/** Everyone in the alliance, by battlegroup. Officers and above can remove members from here. */
+/** Everyone in the alliance, by battlegroup. Officers and above can move members between battlegroups and remove them from here. */
 export default function AllianceMemberList({
   members,
   viewerId,
@@ -45,7 +45,22 @@ export default function AllianceMemberList({
 }) {
   const router = useRouter();
   const [removing, setRemoving] = useState<string | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const officer = isOfficerRole(viewerRole);
+
+  async function moveTo(member: AllianceMember, battlegroup: number | null) {
+    setError(null);
+    setMoving(member.id);
+    try {
+      await sendJson(`/api/users/${member.id}`, "PATCH", { battlegroup });
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't move that member.");
+    } finally {
+      setMoving(null);
+    }
+  }
 
   async function remove(member: AllianceMember) {
     if (
@@ -104,6 +119,20 @@ export default function AllianceMemberList({
                       {Icon && <Icon size={11} aria-hidden />}
                       {badge.label}
                     </span>
+                    {officer && (
+                      <select
+                        aria-label={`Battlegroup for ${member.displayName}`}
+                        className="field-input w-24 shrink-0 py-1 text-xs"
+                        value={member.battlegroup ?? ""}
+                        disabled={moving !== null}
+                        onChange={(event) => moveTo(member, event.target.value ? Number(event.target.value) : null)}
+                      >
+                        <option value="">No BG</option>
+                        <option value="1">BG 1</option>
+                        <option value="2">BG 2</option>
+                        <option value="3">BG 3</option>
+                      </select>
+                    )}
                     {canRemove(viewerRole, viewerId, member) && (
                       <button
                         type="button"
