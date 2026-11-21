@@ -78,7 +78,7 @@ Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (see `.env.examp
 
 A free Render web service goes to sleep after about 15 minutes without traffic and takes several seconds to wake (the server starts, then connects to MongoDB and runs its start-up work). The installed app used to show a blank dark screen for that whole time.
 
-- The service worker (`public/sw.js`) now races every page open against a 0.6 second timer. If the server hasn't answered, a cached launch screen (`public/splash.html`, logo plus a progress bar) is shown instantly. It keeps asking the server and switches to the real page the moment it answers. When the server is awake you never see it. Build output under `/_next/static` and the icons are also cached, so repeat opens load faster.
+- The service worker (`public/sw.js`) now races every page open against a 0.6 second timer. If the server hasn't answered, a cached launch screen (`public/splash.html`, logo plus a progress bar) is shown instantly. It stays up until the real page arrives. When the server answers quickly you never see it. Build output under `/_next/static` and the icons are also cached, so repeat opens load faster.
 - iPhones show a launch image while a home-screen app starts. They're generated into `public/splash` (`node scripts/generate-icons.mjs`) for current iPhone sizes, so the logo appears instead of black.
 - To avoid the wait altogether, keep the server awake: point a free uptime monitor (UptimeRobot, cron-job.org) at `https://<your-domain>/api/health?warm=1` every 5 minutes. `?warm=1` also connects to MongoDB so the first real visit is fast. A paid Render instance never sleeps.
 

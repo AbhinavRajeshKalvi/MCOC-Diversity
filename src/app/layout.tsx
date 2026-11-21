@@ -24,6 +24,8 @@ export const metadata: Metadata = {
   title: "War Room — Alliance Diversity Planner",
   description: "Roster and defender-diversity planning for Alliance Wars.",
   applicationName: "War Room",
+  // The standard name for what apple-mobile-web-app-capable does; Chrome's console asks for it.
+  other: { "mobile-web-app-capable": "yes" },
   icons: {
     icon: [
       { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
