@@ -6,6 +6,7 @@ import { withErrorHandling } from "@/lib/api-handler";
 import { loadAllianceFor, toPublicUser } from "@/lib/accounts";
 import { MAX_ALLIANCE_MEMBERS } from "@/lib/members";
 import { allowRequest } from "@/lib/rate-limit";
+import { notifyMemberJoined } from "@/lib/member-notify";
 
 const schema = z.object({ code: z.string().trim().min(4).max(16) });
 
@@ -44,5 +45,6 @@ export const POST = withErrorHandling("POST /api/alliances/join", async (req: Ne
   if (!user) {
     return NextResponse.json({ error: "Leave your current alliance before joining another." }, { status: 409 });
   }
+  notifyMemberJoined(db, alliance._id, { id: user._id, name: user.displayName as string });
   return NextResponse.json({ user: toPublicUser(user), alliance: await loadAllianceFor(db, user) });
 });

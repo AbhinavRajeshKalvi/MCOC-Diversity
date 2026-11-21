@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { verifyPassword } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/api-handler";
 import { clearSessionCookies, loadAllianceFor, normalizeEmail, toPublicUser } from "@/lib/accounts";
+import { notifyMemberLeft } from "@/lib/member-notify";
 import { leaveAlliance } from "@/lib/alliances";
 
 const patchSchema = z.object({
@@ -63,6 +64,9 @@ export const DELETE = withErrorHandling("DELETE /api/account", async (req: NextR
 
   const left = await leaveAlliance(db, user);
   if (!left.ok) return NextResponse.json({ error: left.error }, { status: 409 });
+  if (!left.allianceDeleted && user.allianceId) {
+    notifyMemberLeft(db, user.allianceId as ObjectId, { id: user._id, name: user.displayName as string });
+  }
 
   await db.collection("rosterEntries").deleteMany({ userId: user._id });
   await db.collection("passwordResets").deleteMany({ userId: user._id });

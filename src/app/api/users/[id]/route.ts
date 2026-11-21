@@ -5,6 +5,7 @@ import { requireOfficer } from "@/lib/session";
 import { isLeaderOrAbove, type Role } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/api-handler";
 import { MAX_BATTLEGROUP_MEMBERS, detachFromAlliance } from "@/lib/members";
+import { notifyMemberRemoved } from "@/lib/member-notify";
 
 type DefenderOverrideDoc = { userId?: ObjectId | null; blockedUserIds?: string[] };
 
@@ -152,7 +153,7 @@ export const DELETE = withErrorHandling(
     const db = await getDb();
     const target = await db
       .collection("users")
-      .findOne({ _id: userId, allianceId: officer.alliance }, { projection: { role: 1 } });
+      .findOne({ _id: userId, allianceId: officer.alliance }, { projection: { role: 1, displayName: 1 } });
     if (!target) return NextResponse.json({ error: "Member not found." }, { status: 404 });
     if (target.role === "admin") {
       return NextResponse.json({ error: "The Admin can't be removed." }, { status: 403 });
@@ -165,6 +166,12 @@ export const DELETE = withErrorHandling(
     }
 
     await detachFromAlliance(db, officer.alliance, userId);
+    const alliance = await db.collection("alliances").findOne({ _id: officer.alliance }, { projection: { name: 1 } });
+    notifyMemberRemoved(db, officer.alliance, {
+      member: { id: userId, name: target.displayName as string },
+      by: { id: officer.userId, name: officer.displayName },
+      allianceName: (alliance?.name as string | undefined) ?? "the alliance"
+    });
     return NextResponse.json({ ok: true });
   }
 );

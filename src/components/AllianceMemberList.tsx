@@ -1,6 +1,11 @@
-import { Crown, Gem, ShieldCheck } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Crown, Gem, Loader2, ShieldCheck, UserMinus } from "lucide-react";
 import type { AllianceMember } from "@/lib/members";
-import type { Role } from "@/lib/roles";
+import { isLeaderOrAbove, isOfficerRole, type Role } from "@/lib/roles";
+import { sendJson } from "@/lib/client-fetch";
 
 const GROUPS: { key: 1 | 2 | 3 | null; title: string }[] = [
   { key: 1, title: "Battlegroup 1" },
@@ -19,8 +24,49 @@ const ROLE_BADGE: Record<Role, { label: string; color: string; icon: typeof Crow
   member: { label: "Member", color: "#6E7591", icon: null }
 };
 
-/** Everyone in the alliance, by battlegroup. Shown to every member; officers manage them on the Admin page. */
-export default function AllianceMemberList({ members, viewerId }: { members: AllianceMember[]; viewerId: string }) {
+/** Mirrors the server: officers remove members, the Leader and above remove officers, only the Admin removes the Leader. */
+function canRemove(viewerRole: Role, viewerId: string, member: AllianceMember): boolean {
+  if (member.id === viewerId || !isOfficerRole(viewerRole)) return false;
+  if (member.role === "member") return true;
+  if (member.role === "officer") return isLeaderOrAbove(viewerRole);
+  if (member.role === "leader") return viewerRole === "admin";
+  return false;
+}
+
+/** Everyone in the alliance, by battlegroup. Officers and above can remove members from here. */
+export default function AllianceMemberList({
+  members,
+  viewerId,
+  viewerRole
+}: {
+  members: AllianceMember[];
+  viewerId: string;
+  viewerRole: Role;
+}) {
+  const router = useRouter();
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function remove(member: AllianceMember) {
+    if (
+      !window.confirm(
+        `Remove ${member.displayName} from the alliance? They keep their account and roster, and everyone who has member notifications on will be told you removed them.`
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setRemoving(member.id);
+    try {
+      await sendJson(`/api/users/${member.id}`, "DELETE");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't remove that member.");
+    } finally {
+      setRemoving(null);
+    }
+  }
+
   const sorted = [...members].sort(
     (a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.displayName.localeCompare(b.displayName)
   );
@@ -28,6 +74,7 @@ export default function AllianceMemberList({ members, viewerId }: { members: All
   return (
     <section className="pt-2 space-y-5">
       <h2 className="font-display text-2xl font-semibold text-parchment">Members</h2>
+      {error && <p className="text-sm text-crimson-bright">{error}</p>}
       {GROUPS.map((group) => {
         const inGroup = sorted.filter((m) => m.battlegroup === group.key);
         if (inGroup.length === 0) return null;
@@ -57,6 +104,18 @@ export default function AllianceMemberList({ members, viewerId }: { members: All
                       {Icon && <Icon size={11} aria-hidden />}
                       {badge.label}
                     </span>
+                    {canRemove(viewerRole, viewerId, member) && (
+                      <button
+                        type="button"
+                        onClick={() => remove(member)}
+                        disabled={removing !== null}
+                        className="btn-danger shrink-0 px-2.5 py-1 text-xs"
+                        aria-label={`Remove ${member.displayName}`}
+                      >
+                        {removing === member.id ? <Loader2 size={12} className="animate-spin" /> : <UserMinus size={12} />}
+                        Remove
+                      </button>
+                    )}
                   </li>
                 );
               })}
