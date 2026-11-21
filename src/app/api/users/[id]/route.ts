@@ -129,6 +129,19 @@ export const PATCH = withErrorHandling(
         { allianceId },
         { $pull: { blockedUserIds: userId.toString() } }
       );
+      // Attack spots, takeover requests and Big Things defender nodes belong to
+      // the battlegroup they were made in, so they don't follow the member.
+      const elsewhere = { allianceId, battlegroup: { $ne: battlegroup }, userId };
+      await Promise.all([
+        db.collection("attackAssignments").deleteMany(elsewhere),
+        db.collection("bigThingsAttackAssignments").deleteMany(elsewhere),
+        db.collection("bigThingsDefenderNodes").deleteMany(elsewhere),
+        db.collection("attackTakeoverRequests").deleteMany({
+          allianceId,
+          battlegroup: { $ne: battlegroup },
+          $or: [{ requesterId: userId }, { holderId: userId }]
+        })
+      ]);
     }
 
     return NextResponse.json({ ok: true });
