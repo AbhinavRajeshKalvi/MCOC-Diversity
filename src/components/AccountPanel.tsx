@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { KeyRound, Trash2 } from "lucide-react";
 import { sendJson } from "@/lib/client-fetch";
 import NotificationSettings from "./NotificationSettings";
+import DiscordLink from "./DiscordLink";
 
 type Account = { username: string; displayName: string; email: string | null; hasPassword: boolean };
 
@@ -74,6 +75,8 @@ export default function AccountPanel({ account }: { account: Account }) {
       </form>
 
       <NotificationSettings />
+
+      <DiscordLink />
 
       <section className="panel p-5 space-y-3">
         <h2 className="font-display text-xl tracking-wide text-parchment">Delete account</h2>

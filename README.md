@@ -83,3 +83,7 @@ A free Render web service goes to sleep after about 15 minutes without traffic a
 - To avoid the wait altogether, keep the server awake: point a free uptime monitor (UptimeRobot, cron-job.org) at `https://<your-domain>/api/health?warm=1` every 5 minutes. `?warm=1` also connects to MongoDB so the first real visit is fast. A paid Render instance never sleeps.
 
 After deploying, installed apps pick up the new service worker the next time they're opened (open the app twice).
+
+## Discord bot
+
+`discord-bot/` is a Discord bot for the alliance's server: war commands (`/bookings`, `/book`, `/request`, `/reset`, `/defense`, `/findchamp`, `/roster`…), announcements for bookings, node requests, reset reminders, roster and member changes, chat watching ("I'll take 41", "anyone have Hercules?") and officer tools (`/setup`, `/settings`, `/roles`, `/warmode`). It runs as its own Render web service on the same database. Members link their Discord account under **Account → Discord**. Setup and deploy steps are in [`discord-bot/README.md`](discord-bot/README.md).

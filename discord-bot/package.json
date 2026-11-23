@@ -1,0 +1,29 @@
+{
+  "name": "mcoc-war-room-discord-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discord bot for the War Room planner: war commands, booking announcements, reset reminders, chat watching and officer tools.",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "start": "node start.cjs",
+    "dev": "node --env-file-if-exists=.env start.cjs",
+    "register": "node start.cjs --register",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@napi-rs/canvas": "1.2.0",
+    "discord.js": "14.28.1",
+    "mongodb": "6.10.0",
+    "tsx": "4.23.15",
+    "web-push": "3.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.15",
+    "@types/web-push": "3.6.4",
+    "typescript": "5.5.4"
+  }
+}
