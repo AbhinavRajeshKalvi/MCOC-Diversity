@@ -7,6 +7,7 @@ import { withErrorHandling } from "@/lib/api-handler";
 import { clearSessionCookies, loadAllianceFor, normalizeEmail, toPublicUser } from "@/lib/accounts";
 import { notifyMemberLeft } from "@/lib/member-notify";
 import { leaveAlliance } from "@/lib/alliances";
+import { removeDiscordLink } from "@/lib/discord-link";
 
 const patchSchema = z.object({
   displayName: z.string().trim().min(1, "Enter your in-game name.").max(60).optional(),
@@ -72,6 +73,7 @@ export const DELETE = withErrorHandling("DELETE /api/account", async (req: NextR
   await db.collection("passwordResets").deleteMany({ userId: user._id });
   await db.collection("chatMessages").deleteMany({ userId: user._id });
   await db.collection("pushSubscriptions").deleteMany({ userId: user._id });
+  await removeDiscordLink(db, user._id);
   await db.collection("attackTakeoverRequests").deleteMany({ $or: [{ requesterId: user._id }, { holderId: user._id }] });
   await users.deleteOne({ _id: user._id });
   return clearSessionCookies(NextResponse.json({ ok: true }));

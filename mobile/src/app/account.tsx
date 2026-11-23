@@ -10,6 +10,7 @@ import { colors, fonts } from "@/lib/theme";
 import type { Alliance, User } from "@/lib/types";
 import { Body, Button, Field, Label, Message, Panel, Screen, SectionTitle, TextLink } from "@/components/ui";
 import { RoleBadge } from "@/components/RoleBadge";
+import { DiscordLinkPanel } from "@/components/DiscordLinkPanel";
 
 export default function AccountScreen() {
   const { user, alliance, setSession, signOut } = useAuth();
@@ -111,6 +112,8 @@ export default function AccountScreen() {
         />
         <Button title="Sign out" icon="log-out" variant="ghost" onPress={signOut} />
       </Panel>
+
+      <DiscordLinkPanel />
 
       <Panel>
         <SectionTitle>Delete account</SectionTitle>
