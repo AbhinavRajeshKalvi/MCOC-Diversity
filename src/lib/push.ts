@@ -33,6 +33,22 @@ type SubscriptionDoc = {
 
 let configured: boolean | null = null;
 
+/**
+ * The contact address sent to the push services. Apple's service rejects
+ * pushes (while Google's accepts them) when it isn't a clean `mailto:address`
+ * or `https://` URL, so tidy up forms like `mailto:War Room <a@b.com>`.
+ */
+export function vapidSubject(): string {
+  const raw = (process.env.VAPID_SUBJECT || `mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL || ""}`).trim();
+  if (/^https:\/\/\S+$/i.test(raw)) return raw;
+  const email = /[^\s<>"',;:]+@[^\s<>"',;:]+\.[^\s<>"',;:]+/.exec(raw)?.[0];
+  if (!email) {
+    console.warn("[push] VAPID_SUBJECT isn't a valid mailto: or https: address; Apple devices may not receive pushes.");
+    return "mailto:admin@example.com";
+  }
+  return `mailto:${email}`;
+}
+
 export function vapidPublicKey(): string | null {
   return process.env.VAPID_PUBLIC_KEY?.trim() || null;
 }
@@ -46,7 +62,7 @@ function ensureConfigured(): boolean {
     configured = false;
     return false;
   }
-  const subject = process.env.VAPID_SUBJECT?.trim() || `mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL || "admin@example.com"}`;
+  const subject = vapidSubject();
   webpush.setVapidDetails(subject, publicKey, privateKey);
   configured = true;
   return true;
@@ -119,7 +135,15 @@ export async function sendPush(db: Db, kind: NotificationKind, userIds: ObjectId
         if (status === 404 || status === 410) {
           await db.collection(PUSH_SUBSCRIPTIONS).deleteOne({ _id: sub._id });
         } else {
-          console.warn(`[push] couldn't notify ${String(sub.userId)}:`, status ?? err);
+          const detail = (err as { body?: string }).body;
+          const host = (() => {
+            try {
+              return new URL(sub.endpoint).host;
+            } catch {
+              return "unknown";
+            }
+          })();
+          console.warn(`[push] couldn't notify ${String(sub.userId)} via ${host}: ${status ?? err} ${detail ?? ""}`.trim());
         }
       }
     })
