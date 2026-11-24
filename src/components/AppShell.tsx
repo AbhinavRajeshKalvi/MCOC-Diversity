@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CircleUser, Crosshair, Flag, Loader2, LogOut, Menu, MessagesSquare, Shield, Swords, Users, UserCog, X, type LucideIcon } from "lucide-react";
+import { CircleUser, Crosshair, Flag, Loader2, LogOut, Menu, MessagesSquare, Shield, Swords, Target, Users, UserCog, X, type LucideIcon } from "lucide-react";
 import { isOfficerRole, type Role } from "@/lib/roles";
 import FloatingChat from "./FloatingChat";
 import BrandMark from "./BrandMark";
@@ -22,11 +22,19 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/battlegroups", label: "Battlegroups", icon: Users, accent: "#38BDF8" },
   { href: "/attack", label: "Attack", icon: Crosshair, accent: "#FACC15" },
   { href: "/counters", label: "Counters", icon: Swords, accent: "#F87171" },
+  { href: "/counters/finder", label: "Counter Finder", icon: Target, accent: "#FB923C" },
   { href: "/profile", label: "My Roster", icon: Shield, accent: "#4ADE80" },
   { href: "/alliance", label: "Alliance", icon: Flag, accent: "#60A5FA" },
   { href: "/chat", label: "Chat", icon: MessagesSquare, accent: "#4FD1A9" }
 ];
 const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin", icon: UserCog, accent: "#C084FC" };
+
+/** The nav item for a path: the longest matching href, so /counters/finder isn't also "Counters". */
+function matchItem(items: NavItem[], path: string): NavItem | undefined {
+  return items
+    .filter((item) => path === item.href || path.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+}
 
 export default function AppShell({
   session,
@@ -72,7 +80,7 @@ export default function AppShell({
     const newTab = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
     if (newTab) return;
     setMenuOpen(false);
-    if (pathname.startsWith(href)) return;
+    if ((matchItem(items, pathname)?.href ?? pathname) === (matchItem(items, href)?.href ?? href)) return;
     setPendingHref(href);
   }
 
@@ -86,7 +94,7 @@ export default function AppShell({
   const pendingLabel = pendingHref
     ? items.find((item) => item.href === pendingHref)?.label ?? (pendingHref === "/account" ? "Account" : "page")
     : null;
-  const currentItem = items.find((item) => pathname.startsWith(item.href));
+  const currentItem = matchItem(items, pathname);
   const initials = session.displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -110,7 +118,7 @@ export default function AppShell({
       </div>
       <nav className="px-3 flex flex-col gap-1">
         {items.map((item) => {
-          const active = pendingHref ? pendingHref === item.href : pathname.startsWith(item.href);
+          const active = pendingHref ? pendingHref === item.href : currentItem?.href === item.href;
           const Icon = item.icon;
           return (
             <Link

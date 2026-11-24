@@ -1,6 +1,7 @@
 import { requirePageSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { loadCounterData } from "@/lib/counter-data";
+import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import CounterFinder from "@/components/CounterFinder";
 import DbErrorNotice from "@/components/DbErrorNotice";
@@ -25,7 +26,12 @@ export default async function CountersPage({ searchParams }: { searchParams: { d
       <h1 className="page-title">Counters</h1>
       <p className="page-lede">
         Search a defender to see the best champions to bring against it, ranked, with a note on why each one works.
-        Counters you own are marked with your copy&apos;s stats.
+        Counters you own are marked with your copy&apos;s stats. To rank your own roster against a boss plus node
+        effects, try the{" "}
+        <Link href="/counters/finder" className="text-brass-bright hover:underline">
+          Counter Finder
+        </Link>
+        .
       </p>
       {dbError ? (
         <DbErrorNotice message={dbError} />
