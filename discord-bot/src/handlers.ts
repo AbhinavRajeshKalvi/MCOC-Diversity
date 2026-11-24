@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  DiscordAPIError,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
@@ -55,7 +56,12 @@ export async function handleInteraction(client: Client, interaction: Interaction
     if (interaction.isButton()) return await button(client, interaction);
     if (interaction.isChatInputCommand()) return await command(client, interaction);
   } catch (err) {
-    const text = err instanceof UserError ? err.message : "Something went wrong. Try again in a moment.";
+    const text =
+      err instanceof UserError
+        ? err.message
+        : err instanceof DiscordAPIError
+          ? discordErrorText(err)
+          : "Something went wrong. Try again in a moment.";
     if (!(err instanceof UserError)) console.error("[interaction]", err);
     if (interaction.isAutocomplete()) return interaction.respond([]).catch(() => undefined);
     if (!interaction.isRepliable()) return;
@@ -63,6 +69,14 @@ export async function handleInteraction(client: Client, interaction: Interaction
     if (interaction.deferred || interaction.replied) await interaction.followUp(payload).catch(() => undefined);
     else await interaction.reply(payload).catch(() => undefined);
   }
+}
+
+/** Plain words for the Discord errors people actually hit. */
+function discordErrorText(err: DiscordAPIError): string {
+  if (err.code === 50001) return "The bot can't see this channel. Give its role **View Channel** and **Read Message History** here.";
+  if (err.code === 50013) return "The bot is missing a permission it needs here (for /purge, **Manage Messages**). Check its role and this channel's Permissions.";
+  if (err.code === 50034) return "Discord can't bulk delete messages older than 14 days.";
+  return `Discord refused that: ${err.message}`;
 }
 
 // ---------------------------------------------------------------- commands
@@ -386,10 +400,18 @@ async function purge(i: ChatInputCommandInteraction) {
   if (!i.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
     throw new UserError("You need Discord's Manage Messages permission to purge.");
   }
-  const me = i.guild?.members.me;
-  if (!me || !i.channel.permissionsFor(me)?.has(PermissionFlagsBits.ManageMessages)) {
+  const me = i.guild?.members.me ?? (await i.guild?.members.fetchMe().catch(() => null));
+  const botPerms = me ? i.channel.permissionsFor(me) : null;
+  const missing = [
+    [PermissionFlagsBits.ViewChannel, "View Channel"],
+    [PermissionFlagsBits.ReadMessageHistory, "Read Message History"],
+    [PermissionFlagsBits.ManageMessages, "Manage Messages"]
+  ]
+    .filter(([flag]) => !botPerms?.has(flag as bigint))
+    .map(([, name]) => `**${name}**`);
+  if (missing.length) {
     throw new UserError(
-      "The bot needs the **Manage Messages** permission in this channel. Give its role that permission in Server Settings → Roles, or in this channel's settings."
+      `The bot is missing ${missing.join(", ")} in this channel. Turn ${missing.length > 1 ? "them" : "it"} on for the War Room role in Server Settings → Roles, and check this channel's own Permissions don't turn ${missing.length > 1 ? "them" : "it"} off.`
     );
   }
   const count = i.options.getInteger("count", true);
@@ -422,7 +444,9 @@ async function purge(i: ChatInputCommandInteraction) {
     await i.editReply({ embeds: [okEmbed(tooOld ? "Nothing to delete: matching messages are over 14 days old, which Discord can't bulk delete." : "No matching messages found.")] });
     return;
   }
-  const deleted = await channel.bulkDelete(picked, true);
+  const deleted = picked.length === 1
+    ? await channel.messages.delete(picked[0]).then(() => new Map([[picked[0], true]]))
+    : await channel.bulkDelete(picked, true);
   const who = user ? ` from **${user.username}**` : includeBots ? "" : " (bot messages left alone)";
   const lines = [`🧹 Deleted **${deleted.size}** message${deleted.size === 1 ? "" : "s"}${who}.`];
   if (deleted.size < count && tooOld) lines.push("Older messages are over 14 days old, which Discord can't bulk delete.");
