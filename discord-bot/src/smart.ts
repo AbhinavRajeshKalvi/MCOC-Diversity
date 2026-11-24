@@ -63,7 +63,10 @@ async function findChampText(message: Message<true>, query: { name: string; bg: 
 }
 
 /** "!roster @someone", "!roster 123456789012345678" or "!roster In-game Name"; "!roster" alone is your own. */
-async function rosterText(message: Message<true>, arg: string) {
+async function rosterText(message: Message<true>, rawArg: string) {
+  // "!roster @someone all" shows every champion, not just rank 4 and up.
+  const all = /\s*\ball$/i.test(rawArg);
+  const arg = rawArg.replace(/\s*\ball$/i, "").trim();
   const db = await getDb();
   const config = await getGuildConfig(db, message.guildId);
   if (!config) return;
@@ -94,7 +97,7 @@ async function rosterText(message: Message<true>, arg: string) {
     return;
   }
   await message.channel.sendTyping().catch(() => undefined);
-  for (const reply of await rosterReplies(db, target)) {
+  for (const reply of await rosterReplies(db, target, all)) {
     await message.reply({ ...reply, allowedMentions: { repliedUser: false } });
   }
 }

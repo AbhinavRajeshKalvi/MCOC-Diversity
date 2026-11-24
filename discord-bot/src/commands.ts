@@ -83,7 +83,8 @@ export const COMMANDS: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [
     .setName("roster")
     .setDescription("Someone's whole roster (leave both options out for your own)")
     .addUserOption((o) => o.setName("user").setDescription("Their Discord account (they need to have linked it)"))
-    .addStringOption((o) => o.setName("member").setDescription("Or pick their in-game name").setAutocomplete(true)),
+    .addStringOption((o) => o.setName("member").setDescription("Or pick their in-game name").setAutocomplete(true))
+    .addBooleanOption((o) => o.setName("all").setDescription("Show every champion, not just rank 4 and up")),
 
   new SlashCommandBuilder()
     .setName("warmode")
@@ -136,6 +137,25 @@ export const COMMANDS: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [
             .setDescription("Channel (leave out to use the main one)")
             .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
         )
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("kind-channel")
+        .setDescription("Send one kind of announcement (e.g. roster updates) to its own channel")
+        .addStringOption((o) =>
+          o
+            .setName("kind")
+            .setDescription("What")
+            .setRequired(true)
+            .addChoices(...ANNOUNCE_KINDS.map(({ kind, label }) => ({ name: label, value: kind })))
+        )
+        .addChannelOption((o) =>
+          o
+            .setName("channel")
+            .setDescription("Channel (leave out to stop using a separate one)")
+            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+        )
+        .addIntegerOption((o) => bgOption(o, "Only for this battlegroup (leave out for all)"))
     )
     .addSubcommand((s) =>
       s

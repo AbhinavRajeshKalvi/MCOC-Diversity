@@ -11,8 +11,9 @@ app's own booking code, so the rules are the same in Discord and in the app.
   alliance's rosters with stars, rank, sig and battlegroup, strongest first.
   Add `bg:` (or type `!findchamp solvarch bg1`) for one battlegroup only.
 - **See a roster**: `/roster user:@someone` (or `member:` with their in-game
-  name) sends a picture of their whole roster: champion portraits grouped
-  by stars, each with rank, ascension, sig level and PI. `!roster @someone` or `!roster <name>` works in chat too.
+  name) sends a picture of their rank 4 and higher champions: portraits grouped
+  by rank (R5, then R4), each with rank, ascension, sig level and PI. Add `all:True` (or
+  `!roster @someone all`) for the whole roster. `!roster @someone` or `!roster <name>` works in chat too.
 - **Announcements** in a channel you pick: nodes booked, freed or handed over,
   node requests (the holder gets a DM with *Hand it over* / *Keep it* buttons),
   reminders before the attack reset with each battlegroup's open nodes, the
@@ -51,11 +52,11 @@ From then on the bot knows who they are, their battlegroup and their role.
    - You can turn off **Public Bot** so only you can add it to servers.
 3. **Installation** (or **OAuth2 → URL Generator**): scopes `bot` and
    `applications.commands`. Bot permissions: View Channels, Send Messages,
-   Embed Links, Read Message History, and Manage Roles (only for `/roles`).
+   Embed Links, Attach Files, Read Message History, and Manage Roles (only for `/roles`).
    Or use this link with your application id:
 
    ```
-   https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20applications.commands&permissions=268520448
+   https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20applications.commands&permissions=268553216
    ```
 
 4. Open the link, pick your alliance's server, and authorize.
@@ -121,6 +122,13 @@ JSON like `{"ok":true,"discord":"connected",...}`.
      Drag the bot's role **above** those roles in Server Settings → Roles.
      `/roles map` uses roles you already have.
    - `/settings bg-channel` gives a battlegroup its own channel.
+   - `/settings kind-channel` sends one kind of announcement to its own
+     channel, for every battlegroup or (with `bg`) just one. For example
+     `/settings kind-channel kind:Roster updates bg:BG 1 channel:#bg1-roster`
+     and `/settings kind-channel kind:Node bookings bg:BG 1 channel:#bg1-bookings`.
+     Node requests and reset reminders follow the bookings channel unless you
+     give them their own. Leave out `channel` to undo. `/settings show` lists
+     where each kind goes.
    - `/settings reminders hours:6, 2` changes reminder times (default 2h).
    - `/settings announce` turns single announcement kinds on or off.
    - `/settings smart-watch on:false` turns chat watching off.

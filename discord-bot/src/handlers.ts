@@ -34,6 +34,7 @@ import {
   allianceName,
   getDb,
   getGuildConfig,
+  announcementChannel,
   memberForDiscord,
   toMember,
   updateGuildConfig,
@@ -338,7 +339,7 @@ async function roster(i: ChatInputCommandInteraction) {
     throw new UserError(`${target.displayName} isn't in your alliance.`);
   }
   await i.deferReply();
-  const [first, ...rest] = await rosterReplies(db, target);
+  const [first, ...rest] = await rosterReplies(db, target, i.options.getBoolean("all") ?? false);
   await i.editReply(first);
   for (const message of rest) await i.followUp(message);
 }
@@ -434,6 +435,13 @@ function settingsEmbed(config: GuildConfig) {
         inline: true
       },
       {
+        name: "Where each kind goes",
+        value: ANNOUNCE_KINDS.map(
+          ({ kind, label }) =>
+            `**${label}:** ${[1, 2, 3].map((bg) => `BG ${bg} ${ch(announcementChannel(config, kind, bg))}`).join(" · ")}`
+        ).join("\n")
+      },
+      {
         name: "Reset reminders",
         value: config.reminderHours.length ? config.reminderHours.map((h) => `${h}h before`).join(", ") : "Off",
         inline: true
@@ -463,6 +471,15 @@ async function settings(i: ChatInputCommandInteraction) {
     if (channel) bgChannelIds[bg] = channel.id;
     else delete bgChannelIds[bg];
     await updateGuildConfig(db, config.guildId, { bgChannelIds });
+  } else if (sub === "kind-channel") {
+    const kind = i.options.getString("kind", true) as AnnounceKind;
+    const bg = i.options.getInteger("bg");
+    const channel = i.options.getChannel("channel");
+    const key = bg ? `${kind}:${bg}` : kind;
+    const routes = { ...config.routes };
+    if (channel) routes[key] = channel.id;
+    else delete routes[key];
+    await updateGuildConfig(db, config.guildId, { routes });
   } else if (sub === "announce") {
     const kind = i.options.getString("kind", true) as AnnounceKind;
     await updateGuildConfig(db, config.guildId, { announce: { ...config.announce, [kind]: i.options.getBoolean("on", true) } });

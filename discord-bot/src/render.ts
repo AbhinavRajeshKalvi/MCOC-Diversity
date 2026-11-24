@@ -6,7 +6,7 @@ import { normalizeAscension } from "../../src/lib/ascension";
 import type { ObjectId } from "./store";
 
 // Draws a member's roster as one picture: a grid of champion cards, grouped
-// by star level, each with the portrait, class flag, stars, rank, ascension,
+// by rank, each with the portrait, class flag, stars, rank, ascension,
 // sig level and PI. Looks like the app's champion cards.
 
 const fontDir = (pkg: string) => path.join(path.dirname(require.resolve(`@fontsource/${pkg}/package.json`)), "files");
@@ -71,9 +71,9 @@ export async function loadRosterCards(db: Db, userId: ObjectId): Promise<RosterC
     }))
     .sort(
       (a, b) =>
-        (b.stars ?? 0) - (a.stars ?? 0) ||
-        (b.rating ?? 0) - (a.rating ?? 0) ||
         (b.rank ?? 0) - (a.rank ?? 0) ||
+        (b.rating ?? 0) - (a.rating ?? 0) ||
+        (b.stars ?? 0) - (a.stars ?? 0) ||
         a.name.localeCompare(b.name)
     );
 }
@@ -262,12 +262,13 @@ function drawCard(ctx: SKRSContext2D, card: RosterCard, image: Image | null, x: 
  */
 export async function renderRoster(
   cards: RosterCard[],
-  info: { displayName: string; battlegroup: number | null; allianceName: string }
+  info: { displayName: string; battlegroup: number | null; allianceName: string; note?: string | null }
 ): Promise<Buffer> {
   const columns = cards.length > 160 ? 12 : cards.length > 60 ? 10 : 8;
   const groups: { label: string; cards: RosterCard[] }[] = [];
+  cards = [...cards].sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0) || (b.rating ?? 0) - (a.rating ?? 0));
   for (const card of cards) {
-    const label = card.stars ? `${card.stars}-STAR` : "OTHER";
+    const label = card.rank ? `RANK ${card.rank}` : "UNRANKED";
     const group = groups[groups.length - 1];
     if (group?.label === label) group.cards.push(card);
     else groups.push({ label, cards: [card] });
@@ -308,7 +309,7 @@ export async function renderRoster(
   ctx.fillStyle = C.faint;
   ctx.font = '15px "WR Mono"';
   ctx.fillText(
-    `${cards.length} champions${totalPi ? ` · total PI ${totalPi.toLocaleString("en-US")}` : ""}`,
+    `${info.note ?? `${cards.length} champions`}${totalPi ? ` · total PI ${totalPi.toLocaleString("en-US")}` : ""}`,
     PAD,
     80
   );
@@ -321,7 +322,7 @@ export async function renderRoster(
     ctx.textAlign = "left";
     ctx.fillStyle = C.dim;
     ctx.font = '22px "WR Body"';
-    ctx.fillText("No champions on this roster yet.", PAD, HEADER_H + 40);
+    ctx.fillText(info.note ? "No champions at this rank yet." : "No champions on this roster yet.", PAD, HEADER_H + 40);
     return canvas.encode("jpeg", 88);
   }
 
