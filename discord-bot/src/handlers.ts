@@ -95,6 +95,8 @@ async function command(client: Client, i: ChatInputCommandInteraction) {
       return roster(i);
     case "warmode":
       return warMode(i);
+    case "purge":
+      return purge(i);
     case "setup":
       return setup(client, i);
     case "settings":
@@ -125,7 +127,8 @@ function helpEmbed() {
         "",
         "**Chat**: say things like *\"I'll take 41 and 44\"* and the bot offers to book them, or *\"anyone have Hercules?\"* and it lists who does.",
         "",
-        "**Officers**: `/setup`, `/settings`, `/roles`, `/warmode set`, and `/book` or `/unbook` for anyone."
+        "**Officers**: `/setup`, `/settings`, `/roles`, `/warmode set`, and `/book` or `/unbook` for anyone.",
+        "**Moderators**: `/purge 20` deletes the last 20 messages people wrote here (add `user` for one person)."
       ].join("\n")
     );
 }
@@ -365,6 +368,60 @@ async function warMode(i: ChatInputCommandInteraction) {
 }
 
 // ---------------------------------------------------------------- officer tools
+
+/**
+ * Deletes the last `count` messages written by people (or by one person) in
+ * this channel. Discord only bulk-deletes messages under 14 days old, and
+ * pinned messages are kept.
+ */
+async function purge(i: ChatInputCommandInteraction) {
+  if (!i.inGuild() || !i.channel || !("bulkDelete" in i.channel)) throw new UserError("Use /purge in a server text channel.");
+  if (!i.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
+    throw new UserError("You need Discord's Manage Messages permission to purge.");
+  }
+  const me = i.guild?.members.me;
+  if (!me || !i.channel.permissionsFor(me)?.has(PermissionFlagsBits.ManageMessages)) {
+    throw new UserError(
+      "The bot needs the **Manage Messages** permission in this channel. Give its role that permission in Server Settings → Roles, or in this channel's settings."
+    );
+  }
+  const count = i.options.getInteger("count", true);
+  const user = i.options.getUser("user");
+  const includeBots = i.options.getBoolean("include_bots") ?? false;
+  await i.deferReply({ flags: EPHEMERAL });
+
+  const channel = i.channel;
+  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000 + 60_000;
+  const picked: string[] = [];
+  let before: string | undefined;
+  let tooOld = false;
+  // Look back through up to 500 messages to find `count` that match.
+  for (let page = 0; page < 5 && picked.length < count && !tooOld; page += 1) {
+    const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
+    if (batch.size === 0) break;
+    for (const message of batch.values()) {
+      if (message.createdTimestamp < cutoff) {
+        tooOld = true;
+        break;
+      }
+      if (message.pinned || message.interactionMetadata) continue;
+      if (user ? message.author.id !== user.id : !includeBots && (message.author.bot || message.webhookId)) continue;
+      picked.push(message.id);
+      if (picked.length === count) break;
+    }
+    before = batch.last()?.id;
+  }
+  if (picked.length === 0) {
+    await i.editReply({ embeds: [okEmbed(tooOld ? "Nothing to delete: matching messages are over 14 days old, which Discord can't bulk delete." : "No matching messages found.")] });
+    return;
+  }
+  const deleted = await channel.bulkDelete(picked, true);
+  const who = user ? ` from **${user.username}**` : includeBots ? "" : " (bot messages left alone)";
+  const lines = [`🧹 Deleted **${deleted.size}** message${deleted.size === 1 ? "" : "s"}${who}.`];
+  if (deleted.size < count && tooOld) lines.push("Older messages are over 14 days old, which Discord can't bulk delete.");
+  else if (deleted.size < count) lines.push("That's all the matching messages in the last 500.");
+  await i.editReply({ embeds: [okEmbed(lines.join("\n"))] });
+}
 
 async function setup(client: Client, i: ChatInputCommandInteraction) {
   if (!i.inGuild() || !i.guild) throw new UserError("Run /setup in your alliance's Discord server.");
