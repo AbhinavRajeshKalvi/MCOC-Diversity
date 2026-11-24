@@ -16,6 +16,7 @@ import {
   discordIdsFor,
   getDb,
   toMember,
+  announcementChannel,
   type AnnounceKind,
   type GuildConfig,
   type Member
@@ -146,14 +147,16 @@ async function checkAlliance(client: Client, db: Db, allianceId: ObjectId, guild
   const name = (id: string) => now.members.get(id)?.member.displayName ?? before.members.get(id)?.member.displayName ?? "Someone";
   const lines: Line[] = [];
 
+  const everyBg = (kind: AnnounceKind, text: string) => {
+    for (const bg of [1, 2, 3]) lines.push({ kind, bg, text });
+  };
   if (before.mode !== now.mode) {
-    lines.push({ kind: "bookings", bg: null, text: `⚔️ War mode switched to **${WAR_MODE_LABELS[now.mode]}**.` });
+    everyBg("bookings", `⚔️ War mode switched to **${WAR_MODE_LABELS[now.mode]}**.`);
   } else if (now.mode === "regular" && before.lastReset !== now.lastReset) {
-    lines.push({
-      kind: "reminders",
-      bg: null,
-      text: `🔄 **New war cycle.** Bookings on nodes 37-50 have cleared, so book your nodes again. Next reset: ${resetLine(nextAttackReset())}`
-    });
+    everyBg(
+      "reminders",
+      `🔄 **New war cycle.** Bookings on nodes 37-50 have cleared, so book your nodes again. Next reset: ${resetLine(nextAttackReset())}`
+    );
   } else {
     // Bookings.
     const champs = await championNames(
@@ -203,27 +206,25 @@ async function checkAlliance(client: Client, db: Db, allianceId: ObjectId, guild
   for (const [id, entry] of now.members) {
     const old = before.members.get(id);
     if (!old) {
-      lines.push({ kind: "members", bg: null, text: `👋 **${entry.member.displayName}** joined the alliance.` });
+      lines.push({ kind: "members", bg: entry.member.battlegroup, text: `👋 **${entry.member.displayName}** joined the alliance.` });
       changedMembers.push({ member: entry.member, userId: id });
       continue;
     }
     if (old.member.role !== entry.member.role || old.member.battlegroup !== entry.member.battlegroup) {
       changedMembers.push({ member: entry.member, userId: id });
       if (old.member.battlegroup !== entry.member.battlegroup) {
-        lines.push({
-          kind: "members",
-          bg: null,
-          text: `↔️ **${entry.member.displayName}** moved ${old.member.battlegroup ? `from BG ${old.member.battlegroup} ` : ""}to ${entry.member.battlegroup ? `BG ${entry.member.battlegroup}` : "no battlegroup"}.`
-        });
+        // Both battlegroups hear about a move.
+        const text = `↔️ **${entry.member.displayName}** moved ${old.member.battlegroup ? `from BG ${old.member.battlegroup} ` : ""}to ${entry.member.battlegroup ? `BG ${entry.member.battlegroup}` : "no battlegroup"}.`;
+        for (const bg of new Set([old.member.battlegroup, entry.member.battlegroup])) lines.push({ kind: "members", bg, text });
       }
     }
     if (entry.rosterAt && entry.rosterAt !== old.rosterAt) {
-      lines.push({ kind: "roster", bg: null, text: `📋 **${entry.member.displayName}** updated their roster.` });
+      lines.push({ kind: "roster", bg: entry.member.battlegroup, text: `📋 **${entry.member.displayName}** updated their roster.` });
     }
   }
   for (const [id, old] of before.members) {
     if (!now.members.has(id)) {
-      lines.push({ kind: "members", bg: null, text: `🚪 **${old.member.displayName}** left the alliance.` });
+      lines.push({ kind: "members", bg: old.member.battlegroup, text: `🚪 **${old.member.displayName}** left the alliance.` });
       changedMembers.push({ member: null, userId: id });
     }
   }
@@ -251,9 +252,12 @@ async function postLines(client: Client, guilds: GuildConfig[], lines: Line[]) {
     const byChannel = new Map<string, string[]>();
     for (const line of lines) {
       if (!config.announce[line.kind]) continue;
-      const channelId = (line.bg && config.bgChannelIds[String(line.bg) as "1" | "2" | "3"]) || config.warChannelId;
+      const channelId = announcementChannel(config, line.kind, line.bg);
       if (!channelId) continue;
-      byChannel.set(channelId, [...(byChannel.get(channelId) ?? []), line.text]);
+      const texts = byChannel.get(channelId) ?? [];
+      // Alliance-wide news is sent once per battlegroup; post it once per channel.
+      if (!texts.includes(line.text)) texts.push(line.text);
+      byChannel.set(channelId, texts);
     }
     for (const [channelId, texts] of byChannel) {
       const channel = await channelFor(client, channelId);
@@ -298,7 +302,7 @@ async function sendRequestButtons(
   if (sent.length === 0 && holderDiscord) {
     // DMs closed: post in the battlegroup or announcements channel and mention them.
     for (const config of guilds.filter((g) => g.announce.takeovers)) {
-      const channel = await channelFor(client, config.bgChannelIds[String(request.bg) as "1" | "2" | "3"] ?? config.warChannelId);
+      const channel = await channelFor(client, announcementChannel(config, "takeovers", request.bg));
       const posted = await channel?.send({ ...message, content: `<@${holderDiscord}>` }).catch(() => null);
       if (posted) sent.push({ channelId: posted.channelId, messageId: posted.id });
     }
@@ -363,7 +367,7 @@ async function postReminder(client: Client, db: Db, config: GuildConfig, next: D
       (open.length
         ? `BG ${bg} still has **${open.length}** open node${open.length === 1 ? "" : "s"}: ${open.join(", ")}.`
         : `BG ${bg} has every node 37-50 booked. 💪`);
-    const channel = await channelFor(client, config.bgChannelIds[String(bg) as "1" | "2" | "3"] ?? config.warChannelId);
+    const channel = await channelFor(client, announcementChannel(config, "reminders", bg));
     await channel?.send({ embeds: [new EmbedBuilder().setColor(BRASS).setDescription(text)] }).catch(() => undefined);
   }
 }

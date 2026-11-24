@@ -36,6 +36,11 @@ export type GuildConfig = {
   warChannelId: string | null;
   /** Optional per-battlegroup channels for that battlegroup's bookings and reminders. */
   bgChannelIds: Partial<Record<"1" | "2" | "3", string>>;
+  /**
+   * Channels for one kind of announcement: "<kind>" for every battlegroup, or
+   * "<kind>:<bg>" for one battlegroup. These win over the channels above.
+   */
+  routes: Record<string, string>;
   announce: Record<AnnounceKind, boolean>;
   /** Hours before the attack reset to post a reminder, largest first. */
   reminderHours: number[];
@@ -81,6 +86,21 @@ export async function initStore(db: Db) {
   await db.collection(DISCORD_GUILDS).createIndex({ allianceId: 1 });
 }
 
+/**
+ * Where one kind of announcement goes, most specific first: that kind for the
+ * battlegroup, that kind for everyone, then (node requests and reminders) the
+ * bookings channel, then the battlegroup's channel, then the main channel.
+ */
+export function announcementChannel(config: GuildConfig, kind: AnnounceKind, bg: number | null): string | null {
+  const routes = config.routes;
+  const kinds: AnnounceKind[] = kind === "takeovers" || kind === "reminders" ? [kind, "bookings"] : [kind];
+  for (const k of kinds) {
+    if (bg && routes[`${k}:${bg}`]) return routes[`${k}:${bg}`];
+    if (routes[k]) return routes[k];
+  }
+  return (bg && config.bgChannelIds[String(bg) as "1" | "2" | "3"]) || config.warChannelId;
+}
+
 export async function getGuildConfig(db: Db, guildId: string): Promise<GuildConfig | null> {
   const doc = await db.collection<GuildConfig>(DISCORD_GUILDS).findOne({ guildId });
   return doc ? withDefaults(doc) : null;
@@ -95,6 +115,7 @@ function withDefaults(doc: GuildConfig): GuildConfig {
     ...doc,
     warChannelId: doc.warChannelId ?? null,
     bgChannelIds: doc.bgChannelIds ?? {},
+    routes: doc.routes ?? {},
     announce: { ...DEFAULT_ANNOUNCE, ...(doc.announce ?? {}) },
     reminderHours: Array.isArray(doc.reminderHours) ? doc.reminderHours : [2],
     sentReminders: doc.sentReminders ?? [],

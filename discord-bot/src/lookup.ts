@@ -126,7 +126,7 @@ export function findChampEmbed(championName: string, owners: Owner[], battlegrou
 }
 
 /**
- * A whole roster as messages of embeds, grouped by star level, strongest
+ * A whole roster as messages of embeds, grouped by rank, strongest
  * first. Discord allows 4096 characters per embed and 6000 per message, so a
  * big roster is split across several.
  */
@@ -136,8 +136,9 @@ export function rosterMessages(member: Member, roster: RosterChampion[]): EmbedB
     return [[new EmbedBuilder().setColor(0xe0a93b).setTitle(title).setDescription("No champions on this roster yet.")]];
   }
   const groups = new Map<string, string[]>();
-  for (const c of roster) {
-    const key = c.stars ? `${c.stars}★` : "Other";
+  const byRank = [...roster].sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0));
+  for (const c of byRank) {
+    const key = c.rank ? `Rank ${c.rank}` : "Unranked";
     const bits = [c.rank ? `R${c.rank}` : null, c.sig ? `s${c.sig}` : null, c.ascended ? `A${c.ascended}` : null].filter(Boolean);
     groups.set(key, [...(groups.get(key) ?? []), `${c.name}${bits.length ? ` (${bits.join(" ")})` : ""}`]);
   }
@@ -173,22 +174,34 @@ export function rosterMessages(member: Member, roster: RosterChampion[]): EmbedB
  * The /roster reply: a picture of the whole roster, or the text version if
  * drawing fails. Returns one message's worth per entry.
  */
-export async function rosterReplies(db: Db, member: Member): Promise<{ embeds: EmbedBuilder[]; files: AttachmentBuilder[] }[]> {
+/** By default /roster shows rank 4 and up; `all` shows every champion. */
+export const ROSTER_MIN_RANK = 4;
+
+export async function rosterReplies(
+  db: Db,
+  member: Member,
+  all = false
+): Promise<{ embeds: EmbedBuilder[]; files: AttachmentBuilder[] }[]> {
+  const keep = (rank: number | null) => all || (rank ?? 0) >= ROSTER_MIN_RANK;
   try {
-    const cards = await loadRosterCards(db, member._id);
+    const everything = await loadRosterCards(db, member._id);
+    const cards = everything.filter((card) => keep(card.rank));
     const image = await renderRoster(cards, {
       displayName: member.displayName,
       battlegroup: member.battlegroup,
-      allianceName: member.allianceId ? await allianceName(db, member.allianceId) : ""
+      allianceName: member.allianceId ? await allianceName(db, member.allianceId) : "",
+      note: all ? null : `Rank ${ROSTER_MIN_RANK}+ · ${cards.length} of ${everything.length} champions`
     });
     const file = new AttachmentBuilder(image, { name: "roster.jpg" });
     const embed = new EmbedBuilder()
       .setColor(0xe0a93b)
-      .setTitle(`${member.displayName}'s roster (${cards.length})`)
+      .setTitle(`${member.displayName}'s roster${all ? "" : ` · R${ROSTER_MIN_RANK}+`} (${cards.length})`)
       .setImage("attachment://roster.jpg");
+    if (!all) embed.setFooter({ text: "Add all:True to see every champion" });
     return [{ embeds: [embed], files: [file] }];
   } catch (err) {
     console.error("[roster image]", err);
-    return rosterMessages(member, await memberRoster(db, member._id)).map((embeds) => ({ embeds, files: [] }));
+    const roster = (await memberRoster(db, member._id)).filter((c) => keep(c.rank));
+    return rosterMessages(member, roster).map((embeds) => ({ embeds, files: [] }));
   }
 }
