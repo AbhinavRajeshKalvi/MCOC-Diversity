@@ -44,7 +44,8 @@ export const COMMANDS: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [
       o.setName("champion").setDescription("The champion you'll use (regular map, nodes 37-50)").setAutocomplete(true)
     )
     .addStringOption((o) => o.setName("member").setDescription("Officers: book it for this member").setAutocomplete(true))
-    .addIntegerOption((o) => bgOption(o)),
+    .addIntegerOption((o) => bgOption(o))
+    .addBooleanOption((o) => o.setName("replace").setDescription("Officers: take the node off whoever has it now")),
 
   new SlashCommandBuilder()
     .setName("unbook")

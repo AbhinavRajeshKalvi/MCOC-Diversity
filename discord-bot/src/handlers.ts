@@ -186,7 +186,13 @@ async function book(i: ChatInputCommandInteraction) {
     battlegroup = pickBattlegroup(actor, i.options.getInteger("bg"));
   }
   const node = i.options.getInteger("node", true);
-  const result = await bookNode(db, actor, { battlegroup, node, forUserId, championId: i.options.getString("champion") });
+  const result = await bookNode(db, actor, {
+    battlegroup,
+    node,
+    forUserId,
+    championId: i.options.getString("champion"),
+    replace: i.options.getBoolean("replace") ?? false
+  });
   await i.reply({
     embeds: [
       okEmbed(`Node **${node}** in BG ${battlegroup} is booked for **${result.holderName}**${result.champion ? ` with ${result.champion}` : ""}.`)
