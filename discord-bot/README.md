@@ -28,6 +28,10 @@ app's own booking code, so the rules are the same in Discord and in the app.
   gives Discord roles (War Officer, BG 1, BG 2, BG 3) from War Room roles and
   battlegroups, `/warmode set` switches the war mode, and `/book` or `/unbook`
   with the `member` option act for anyone.
+- **Moderation**: `/purge count:20` deletes the last 20 messages people wrote in
+  the channel (bot messages and pins are kept). Add `user:` for one person's
+  messages, or `include_bots:True`. Needs Manage Messages, for you and the bot.
+  Discord can't bulk delete messages older than 14 days.
 
 Bookings, requests and answers made from Discord also send the app's usual
 push notifications, if you give the bot the same VAPID keys as the app.
@@ -52,11 +56,12 @@ From then on the bot knows who they are, their battlegroup and their role.
    - You can turn off **Public Bot** so only you can add it to servers.
 3. **Installation** (or **OAuth2 → URL Generator**): scopes `bot` and
    `applications.commands`. Bot permissions: View Channels, Send Messages,
-   Embed Links, Attach Files, Read Message History, and Manage Roles (only for `/roles`).
+   Embed Links, Attach Files, Read Message History, Manage Messages (only for
+   `/purge`) and Manage Roles (only for `/roles`).
    Or use this link with your application id:
 
    ```
-   https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20applications.commands&permissions=268553216
+   https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20applications.commands&permissions=268561408
    ```
 
 4. Open the link, pick your alliance's server, and authorize.

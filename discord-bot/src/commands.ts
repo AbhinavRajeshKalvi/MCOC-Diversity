@@ -98,6 +98,17 @@ export const COMMANDS: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [
     ),
 
   new SlashCommandBuilder()
+    .setName("purge")
+    .setDescription("Delete the last messages people wrote in this channel")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setDMPermission(false)
+    .addIntegerOption((o) =>
+      o.setName("count").setDescription("How many messages to delete (1-100)").setRequired(true).setMinValue(1).setMaxValue(100)
+    )
+    .addUserOption((o) => o.setName("user").setDescription("Only delete this person's messages"))
+    .addBooleanOption((o) => o.setName("include_bots").setDescription("Also delete bot messages (left alone by default)")),
+
+  new SlashCommandBuilder()
     .setName("setup")
     .setDescription("Officers: link this Discord server to your alliance")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
