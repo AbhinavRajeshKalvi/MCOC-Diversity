@@ -39,7 +39,13 @@ function toId(id: string | null | undefined): ObjectId | null {
 export async function bookNode(
   db: Db,
   actor: Actor,
-  { battlegroup, node, forUserId, championId }: { battlegroup: 1 | 2 | 3; node: number; forUserId: string | null; championId: string | null }
+  {
+    battlegroup,
+    node,
+    forUserId,
+    championId,
+    replace = false
+  }: { battlegroup: 1 | 2 | 3; node: number; forUserId: string | null; championId: string | null; replace?: boolean }
 ) {
   const mode = await getWarMode(db, actor.allianceId);
   const slot = checkNode(node, mode);
@@ -47,6 +53,18 @@ export async function bookNode(
   if (forUserId && !toId(forUserId)) throw new UserError("Pick a member from the list.");
   if (championId && !toId(championId)) throw new UserError("Pick a champion from the list.");
   if (championId && mode !== "regular") throw new UserError("Champions are only picked on the regular map.");
+
+  // Officers can put anyone anywhere in the app, so the shared code lets them
+  // overwrite a booking. From Discord that only happens when asked for.
+  const current = (await loadAttackBoard(db, actor.allianceId, battlegroup, mode)).assignments[slot];
+  if (current && current.userId !== userId && !(actor.isOfficer && replace)) {
+    throw new UserError(
+      `Node ${node} in BG ${battlegroup} is already booked by **${current.displayName}**. ` +
+        (actor.isOfficer
+          ? "Add `replace:True` to take it off them, or use `/request` to ask for it."
+          : "Use `/request` to ask them for it.")
+    );
+  }
 
   const result = await setAttackSlot(db, {
     allianceId: actor.allianceId,
