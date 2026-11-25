@@ -13,9 +13,14 @@ let queue: Promise<unknown> = Promise.resolve();
 function langPath(): string {
   // English model shipped as an npm package (@tesseract.js-data/eng), so
   // nothing is downloaded from a CDN at runtime.
+  // The Discord bot runs these files from ../src with its own node_modules on
+  // NODE_PATH (see discord-bot/start.cjs), so look there too.
+  const data = ["@tesseract.js-data", "eng", "4.0.0_best_int"];
+  const nodePaths = (process.env.NODE_PATH ?? "").split(path.delimiter).filter(Boolean);
   const candidates = [
-    path.join(process.cwd(), "node_modules", "@tesseract.js-data", "eng", "4.0.0_best_int"),
-    path.join(__dirname, "..", "..", "..", "node_modules", "@tesseract.js-data", "eng", "4.0.0_best_int")
+    path.join(process.cwd(), "node_modules", ...data),
+    path.join(__dirname, "..", "..", "..", "node_modules", ...data),
+    ...nodePaths.map((p) => path.join(p, ...data))
   ];
   return candidates.find((p) => fs.existsSync(path.join(p, "eng.traineddata.gz"))) ?? candidates[0];
 }

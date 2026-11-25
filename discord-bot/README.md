@@ -14,6 +14,13 @@ app's own booking code, so the rules are the same in Discord and in the app.
   name) sends a picture of their rank 4 and higher champions: portraits grouped
   by rank (R5, then R4), each with rank, ascension, sig level and PI. Add `all:True` (or
   `!roster @someone all`) for the whole roster. `!roster @someone` or `!roster <name>` works in chat too.
+- **Import a roster from screenshots**: `/roster-import` with 1 to 5 Battle
+  Deck screenshots reads every card (champion, stars, rank, sig, PI, awakened,
+  ascension) with the same free, local scanner as the app. The bot answers only
+  you with how many cards it read and a **Review and save** button that opens
+  the results on the app's roster page. Nothing is saved until you confirm
+  there; the link works for 24 hours and only for your own account. Needs
+  `APP_URL`.
 - **Announcements** in a channel you pick: nodes booked, freed or handed over,
   node requests (the holder gets a DM with *Hand it over* / *Keep it* buttons),
   reminders before the attack reset with each battlegroup's open nodes, the
@@ -99,7 +106,7 @@ run the commands inside `discord-bot`:
 | --- | --- |
 | `DISCORD_TOKEN` | the bot token from step 1 |
 | `MONGODB_URI` | the **same** connection string as the app |
-| `APP_URL` | your app's address, e.g. `https://your-war-room.onrender.com` |
+| `APP_URL` | your app's address, e.g. `https://your-war-room.onrender.com` (also needed for `/roster-import`'s review link) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | optional, copy from the app so Discord actions send push notifications |
 | `NODE_VERSION` | `20` or newer (optional) |
 

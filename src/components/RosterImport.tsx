@@ -1,17 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AlertTriangle, Check, ImagePlus, Loader2, Lock, Trash2, UploadCloud, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Check, ImagePlus, Loader2, Lock, MessageSquare, Trash2, UploadCloud, X } from "lucide-react";
 import { SCREENSHOT_IMPORT_ENABLED } from "@/lib/features";
 import type { ImportRow } from "@/lib/roster-scan/analyze";
+import { DRAFT_PARAM, REVIEW_THRESHOLD } from "@/lib/roster-scan/constants";
 
 type Champion = { id: string; name: string; imageUrl: string | null };
 
 /** A review row: what the scanner read, plus the champion the scanner guessed. */
 type ReviewRow = ImportRow & { guessedChampionId: string | null };
-
-/** Below this, a row is flagged for the user to check. */
-const REVIEW_THRESHOLD = 0.5;
 
 export default function RosterImport({ champions, onImported }: { champions: Champion[]; onImported: () => Promise<void> }) {
   const [files, setFiles] = useState<File[]>([]);
@@ -22,6 +20,41 @@ export default function RosterImport({ champions, onImported }: { champions: Cha
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
+  /** Set when the rows came from a /roster-import scan in Discord. */
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // A link from the Discord bot opens its scan here: /profile?importDraft=<token>.
+  useEffect(() => {
+    if (!SCREENSHOT_IMPORT_ENABLED) return;
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get(DRAFT_PARAM);
+    if (!id) return;
+    url.searchParams.delete(DRAFT_PARAM);
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    let cancelled = false;
+    setBusy(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/roster/import-draft/${encodeURIComponent(id)}`, { cache: "no-store" });
+        const data: { error?: string; rows?: ImportRow[]; errors?: { file: string; error: string }[] } = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? `Couldn't open the import from Discord (HTTP ${res.status}).`);
+        if (cancelled) return;
+        setRows((data.rows ?? []).map((r) => ({ ...r, guessedChampionId: r.championId })));
+        setWarnings((data.errors ?? []).map((e) => `${e.file}: ${e.error}`));
+        setDraftId(id);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Couldn't open the import from Discord.");
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function addFiles(incoming: FileList | File[]) {
     const images = Array.from(incoming).filter((file) => ["image/jpeg", "image/png", "image/webp"].includes(file.type));
@@ -90,7 +123,8 @@ export default function RosterImport({ champions, onImported }: { champions: Cha
             ascended: r.ascended,
             feature: r.feature,
             guessedChampionId: r.guessedChampionId
-          }))
+          })),
+          ...(draftId ? { draftId } : {})
         })
       });
       const data = await res.json();
@@ -98,6 +132,7 @@ export default function RosterImport({ champions, onImported }: { champions: Cha
       setFiles([]);
       setRows(null);
       setWarnings([]);
+      setDraftId(null);
       setSaved(`Saved ${data.imported} champion${data.imported === 1 ? "" : "s"} to your roster.`);
       await onImported();
     } catch (err) {
@@ -131,7 +166,7 @@ export default function RosterImport({ champions, onImported }: { champions: Cha
   }
 
   return (
-    <div className="panel p-5 space-y-5">
+    <div ref={panelRef} className="panel p-5 space-y-5 scroll-mt-4">
       <div>
         <div className="flex items-center gap-2 mb-1">
           <ImagePlus size={18} className="text-brass-bright" />
@@ -182,16 +217,20 @@ export default function RosterImport({ champions, onImported }: { champions: Cha
           rows={rows}
           warnings={warnings}
           champions={champions}
+          fromDiscord={!!draftId}
           onChange={updateRow}
           onRemove={removeRow}
-          onCancel={() => { setRows(null); setWarnings([]); setError(null); }}
+          onCancel={() => { setRows(null); setWarnings([]); setError(null); setDraftId(null); }}
           onConfirm={confirm}
           confirming={confirming}
         />
       )}
 
+      {busy && !rows && files.length === 0 && (
+        <p className="text-sm text-parchment-faint"><Loader2 size={14} className="inline mr-1 animate-spin" />Opening the import from Discord…</p>
+      )}
       {error && <p className="text-sm text-crimson-bright">{error}</p>}
-      {saved && <p className="text-sm text-emerald-400">{saved}</p>}
+      {saved &&<p className="text-sm text-emerald-400">{saved}</p>}
     </div>
   );
 }
@@ -200,6 +239,7 @@ function ImportReview({
   rows,
   warnings,
   champions,
+  fromDiscord,
   onChange,
   onRemove,
   onCancel,
@@ -209,6 +249,7 @@ function ImportReview({
   rows: ReviewRow[];
   warnings: string[];
   champions: Champion[];
+  fromDiscord: boolean;
   onChange: (key: string, patch: Partial<ReviewRow>) => void;
   onRemove: (key: string) => void;
   onCancel: () => void;
@@ -228,6 +269,11 @@ function ImportReview({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="font-display text-lg text-parchment">Review import</h4>
+          {fromDiscord && (
+            <p className="text-xs text-brass-bright mb-0.5">
+              <MessageSquare size={12} className="inline mr-1" />From Discord: these were read from the screenshots you sent the bot.
+            </p>
+          )}
           <p className="text-xs text-parchment-faint">
             {rows.length} card{rows.length === 1 ? "" : "s"} read.{" "}
             {flagged > 0 ? `${flagged} need a check and are listed first.` : "All look confident, but give them a glance."} Nothing is saved until you confirm.

@@ -7,6 +7,7 @@ import { withErrorHandling } from "@/lib/api-handler";
 import { normalizeAscension } from "@/lib/ascension";
 import { notifyRosterUpdated } from "@/lib/roster-notify";
 import { saveSamples } from "@/lib/roster-scan/references";
+import { deleteDraft } from "@/lib/roster-scan/drafts";
 
 const championSchema = z.object({
   championId: z.string().min(1),
@@ -24,7 +25,9 @@ const championSchema = z.object({
 });
 
 const schema = z.object({
-  champions: z.array(championSchema).min(1).max(500)
+  champions: z.array(championSchema).min(1).max(500),
+  // Set when the rows came from a Discord scan; that draft is deleted once saved.
+  draftId: z.string().max(64).optional()
 });
 
 export const POST = withErrorHandling("POST /api/roster/confirm", async (req: NextRequest) => {
@@ -93,10 +96,15 @@ export const POST = withErrorHandling("POST /api/roster/confirm", async (req: Ne
   await notifyRosterUpdated(db, userId, session.userId);
 
   try {
-    await saveSamples(session.userId, samples);
+    await saveSamples(db, session.userId, samples);
   } catch (error) {
     // Learning is a bonus; the roster is already saved.
     console.error("Could not store screenshot samples:", error);
+  }
+
+  // A Discord scan that has now been saved isn't needed any more.
+  if (parsed.data.draftId) {
+    await deleteDraft(db, parsed.data.draftId, userId).catch((error) => console.error("Could not delete import draft:", error));
   }
 
   const savedCount = await db.collection("rosterEntries").countDocuments({ userId });
