@@ -45,6 +45,7 @@ import { answerRequest, askForNode, bookNode, unbookNode } from "./war";
 import { TAKEOVER_REQUESTS } from "../../src/lib/attack-plans";
 import { nodeSlot } from "../../src/lib/attack-map";
 import { counter, counterAutocomplete } from "./counter";
+import { rosterImport } from "./roster-import";
 
 const EPHEMERAL = MessageFlags.Ephemeral;
 
@@ -96,6 +97,8 @@ async function command(client: Client, i: ChatInputCommandInteraction) {
       return roster(i);
     case "counter":
       return counter(i);
+    case "roster-import":
+      return rosterImport(i);
     case "warmode":
       return warMode(i);
     case "purge":

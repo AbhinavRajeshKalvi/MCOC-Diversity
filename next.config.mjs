@@ -10,6 +10,12 @@ const nextConfig = {
     imageSizes: [96, 128, 160, 200, 256],
     // Image URLs are versioned (?v=...), so cached copies can live a long time.
     minimumCacheTTL: 60 * 60 * 24 * 30
+  },
+  experimental: {
+    // tesseract.js starts a worker thread from its own files, so it can't be bundled.
+    serverComponentsExternalPackages: ["tesseract.js"],
+    // Ship the bundled English OCR data with the analyze route (no CDN download).
+    outputFileTracingIncludes: { "/api/roster/analyze": ["./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**"] }
   }
 };
 

@@ -5,6 +5,7 @@ import {
   type RESTPostAPIChatInputApplicationCommandsJSONBody
 } from "discord.js";
 import { ANNOUNCE_KINDS } from "./store";
+import { rosterImportCommand } from "./roster-import";
 
 // Slash command definitions. Handlers are in handlers.ts.
 
@@ -86,6 +87,8 @@ export const COMMANDS: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [
     .addUserOption((o) => o.setName("user").setDescription("Their Discord account (they need to have linked it)"))
     .addStringOption((o) => o.setName("member").setDescription("Or pick their in-game name").setAutocomplete(true))
     .addBooleanOption((o) => o.setName("all").setDescription("Show every champion, not just rank 4 and up")),
+
+  rosterImportCommand,
 
   new SlashCommandBuilder()
     .setName("counter")
