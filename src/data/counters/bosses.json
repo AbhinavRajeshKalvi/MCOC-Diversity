@@ -1,0 +1,259 @@
+{
+  "_readme": "Bosses and common defenders. name is shown in search; champion (optional) links to a champions.json name when it differs. inflicts = effects the boss puts on you; immunities = effects the boss ignores (your damage of that type is wasted); helpfulTraits / harmfulTraits = traits from effects.json with weight 1-3 and why; strongCounters / avoid = champion names. Written from memory and mostly low/medium confidence: please correct.",
+  "bosses": [
+    {
+      "name": "Onslaught", "class": "Mutant",
+      "inflicts": [],
+      "immunities": [],
+      "helpfulTraits": [
+        { "trait": "power-control", "weight": 3, "why": "keeps his specials and power-based abilities in check" },
+        { "trait": "high-burst", "weight": 1, "why": "shortens the fight" }
+      ],
+      "strongCounters": ["Bastion", "Jack O'Lantern"],
+      "confidence": "low",
+      "notes": "Counter list from the request (Techs such as Bastion, plus Jack O'Lantern). His exact kit is not modelled: add inflicts/immunities once confirmed."
+    },
+    {
+      "name": "Kang the Conqueror", "champion": "Kang the Conqueror", "class": "Tech",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "high-burst", "weight": 2, "why": "end phases quickly" },
+        { "trait": "true-damage", "weight": 1, "why": "gets through his damage reduction" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Grandmaster", "class": "Cosmic",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "high-burst", "weight": 2, "why": "a long boss fight rewards big damage" },
+        { "trait": "nullify", "weight": 1, "why": "removes his buffs" }
+      ],
+      "confidence": "low",
+      "notes": "Story boss; not a playable champion in this app."
+    },
+    {
+      "name": "Collector", "class": "Cosmic",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "nullify", "weight": 2, "why": "removes the buffs he stacks" },
+        { "trait": "high-burst", "weight": 1, "why": "shortens the fight" }
+      ],
+      "confidence": "low",
+      "notes": "Story boss; not a playable champion in this app."
+    },
+    {
+      "name": "Maestro", "class": "Science",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "high-burst", "weight": 2, "why": "he grows stronger as the fight goes on" },
+        { "trait": "armor-break", "weight": 1, "why": "cuts through his durability" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Ultron", "class": "Tech",
+      "inflicts": [],
+      "immunities": ["bleed", "poison"],
+      "helpfulTraits": [
+        { "trait": "metal-control", "weight": 3, "why": "robot/metal specialists shut him down" },
+        { "trait": "heal-block", "weight": 2, "why": "stops his regeneration" },
+        { "trait": "armor-break", "weight": 1, "why": "removes his armor" }
+      ],
+      "strongCounters": ["Magneto", "Magneto (House of X)"],
+      "confidence": "medium"
+    },
+    {
+      "name": "Thanos", "class": "Cosmic",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "power-control", "weight": 2, "why": "his specials hit very hard" },
+        { "trait": "high-burst", "weight": 1, "why": "shortens the fight" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Mephisto", "class": "Mystic",
+      "inflicts": ["incinerate"],
+      "immunities": ["incinerate"],
+      "helpfulTraits": [
+        { "trait": "power-control", "weight": 1, "why": "limits his specials" },
+        { "trait": "tenacity", "weight": 1, "why": "shrugs off his debuffs" }
+      ],
+      "confidence": "low",
+      "notes": "Hellfire: incinerate on both sides is a guess."
+    },
+    {
+      "name": "Hela", "class": "Cosmic",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "heal-block", "weight": 1, "why": "she sustains through the fight" },
+        { "trait": "high-burst", "weight": 1, "why": "shortens the fight" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Knull", "class": "Cosmic",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "high-burst", "weight": 2, "why": "shortens a long fight" },
+        { "trait": "nullify", "weight": 1, "why": "removes his buffs" }
+      ],
+      "favorsInflicts": ["incinerate"],
+      "confidence": "low",
+      "notes": "Symbiote god; fire being good is a guess."
+    },
+    {
+      "name": "Dormammu", "class": "Mystic",
+      "inflicts": ["degeneration"],
+      "immunities": ["bleed", "poison"],
+      "helpfulTraits": [
+        { "trait": "regen", "weight": 2, "why": "outheals his degeneration" },
+        { "trait": "high-burst", "weight": 1, "why": "less time taking degen" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "The Serpent", "class": "Mystic",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "high-burst", "weight": 1, "why": "shortens the fight" },
+        { "trait": "power-control", "weight": 1, "why": "limits his specials" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Kingpin", "class": "Skill",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "ranged", "weight": 1, "why": "stay out of his punishing melee" },
+        { "trait": "sustained-damage", "weight": 1, "why": "chip through his durability" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Sentinel", "class": "Tech",
+      "inflicts": [],
+      "immunities": ["bleed", "poison"],
+      "helpfulTraits": [
+        { "trait": "metal-control", "weight": 3, "why": "robot specialists shut him down" },
+        { "trait": "true-damage", "weight": 1, "why": "ignores his adapting defenses" }
+      ],
+      "harmfulTraits": [],
+      "strongCounters": ["Magneto", "Magneto (House of X)"],
+      "confidence": "medium",
+      "notes": "Stronger against Mutant attackers."
+    },
+    {
+      "name": "Captain America (Infinity War)", "class": "Science",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "unblockable", "weight": 2, "why": "he blocks and parries a lot" },
+        { "trait": "armor-break", "weight": 1, "why": "removes his armor" },
+        { "trait": "true-strike", "weight": 1, "why": "gets through his defensive abilities" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Nick Fury", "class": "Skill",
+      "inflicts": ["bleed", "armor-break"],
+      "helpfulTraits": [
+        { "trait": "tenacity", "weight": 1, "why": "shrugs off his debuffs" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Doctor Doom", "class": "Mystic",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "power-control", "weight": 2, "why": "limits his specials" },
+        { "trait": "nullify", "weight": 1, "why": "removes his buffs" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Hercules", "class": "Cosmic",
+      "inflicts": ["armor-break"],
+      "helpfulTraits": [
+        { "trait": "high-burst", "weight": 2, "why": "push through Immortality quickly" },
+        { "trait": "sustained-damage", "weight": 1, "why": "keep damage up while he cannot die" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Omega Sentinel", "class": "Tech",
+      "inflicts": [],
+      "immunities": ["bleed", "poison"],
+      "helpfulTraits": [
+        { "trait": "metal-control", "weight": 2, "why": "robot specialists shut her down" },
+        { "trait": "power-control", "weight": 1, "why": "limits her specials" }
+      ],
+      "strongCounters": ["Magneto", "Magneto (House of X)"],
+      "confidence": "medium"
+    },
+    {
+      "name": "Korg", "class": "Cosmic",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "armor-break", "weight": 1, "why": "removes his armor" },
+        { "trait": "true-damage", "weight": 1, "why": "gets through his durability" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Quake", "class": "Science",
+      "inflicts": ["concussion"],
+      "helpfulTraits": [
+        { "trait": "true-accuracy", "weight": 2, "why": "gets around her miss/evade style defenses" },
+        { "trait": "true-strike", "weight": 2, "why": "gets around her miss/evade style defenses" },
+        { "trait": "ranged", "weight": 1, "why": "safer than trading in melee" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Warlock", "class": "Tech",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "high-burst", "weight": 1, "why": "shortens the fight" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Sasquatch", "class": "Mutant",
+      "inflicts": ["frostbite"],
+      "immunities": ["coldsnap", "frostbite"],
+      "helpfulTraits": [
+        { "trait": "heal-block", "weight": 1, "why": "stops him sustaining" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Hulkling", "class": "Cosmic",
+      "inflicts": [],
+      "helpfulTraits": [
+        { "trait": "true-damage", "weight": 1, "why": "gets through his damage reduction" },
+        { "trait": "high-burst", "weight": 1, "why": "shortens the fight" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Kate Bishop", "class": "Skill",
+      "inflicts": ["bleed"],
+      "helpfulTraits": [
+        { "trait": "tenacity", "weight": 1, "why": "shrugs off her arrow debuffs" }
+      ],
+      "confidence": "low"
+    },
+    {
+      "name": "Nimrod", "class": "Tech",
+      "inflicts": [],
+      "immunities": ["bleed", "poison"],
+      "helpfulTraits": [
+        { "trait": "metal-control", "weight": 2, "why": "robot specialists shut him down" },
+        { "trait": "true-damage", "weight": 1, "why": "gets through his adaptive defenses" }
+      ],
+      "strongCounters": ["Magneto", "Magneto (House of X)"],
+      "confidence": "low"
+    }
+  ]
+}

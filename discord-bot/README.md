@@ -6,7 +6,7 @@ app's own booking code, so the rules are the same in Discord and in the app.
 **What it does**
 
 - **War commands**: `/bookings`, `/book`, `/unbook`, `/mynodes`, `/node`,
-  `/request`, `/reset`, `/defense`, `/findchamp`, `/warmode`, `/help`.
+  `/request`, `/reset`, `/defense`, `/findchamp`, `/counter`, `/warmode`, `/help`.
 - **Find a champion**: `/findchamp Solvarch` lists every Solvarch on the
   alliance's rosters with stars, rank, sig and battlegroup, strongest first.
   Add `bg:` (or type `!findchamp solvarch bg1`) for one battlegroup only.
@@ -14,6 +14,17 @@ app's own booking code, so the rules are the same in Discord and in the app.
   name) sends a picture of their rank 4 and higher champions: portraits grouped
   by rank (R5, then R4), each with rank, ascension, sig level and PI. Add `all:True` (or
   `!roster @someone all`) for the whole roster. `!roster @someone` or `!roster <name>` works in chat too.
+- **Counter Finder**: `/counter boss:Onslaught nodes:Incinerate on hit, Shock on contact`
+  ranks your roster for a fight, the same way as the app's Counter Finder page:
+  immunity to what the boss and nodes inflict first, then class advantage, how
+  well the champion matches up, and how built-up your copy is. The reply shows
+  the top 8 with score, ★/rank/sig/PI and the main reasons, marks guessed data
+  with ⚠️ (medium) or ⚠️⚠️ (low), and links to the full list in the app (when
+  `APP_URL` is set). `boss` and `nodes` autocomplete; for several nodes, pick
+  one, type a comma, then pick the next. Add `all:True` to rank every champion.
+  Without a linked account (or with an empty roster) it ranks every champion
+  and says why. The champion data lives in `src/data/counters/` and corrections
+  saved on the app's Counter Data page apply here within a minute.
 - **Import a roster from screenshots**: `/roster-import` with 1 to 5 Battle
   Deck screenshots reads every card (champion, stars, rank, sig, PI, awakened,
   ascension) with the same free, local scanner as the app. The bot answers only

@@ -91,6 +91,21 @@ export const COMMANDS: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [
   rosterImportCommand,
 
   new SlashCommandBuilder()
+    .setName("counter")
+    .setDescription("Best counters from your roster for a boss plus node effects")
+    .addStringOption((o) =>
+      o.setName("boss").setDescription("Boss or defender, e.g. Onslaught").setRequired(true).setAutocomplete(true)
+    )
+    .addStringOption((o) =>
+      o
+        .setName("nodes")
+        .setDescription("Node effects, comma-separated, e.g. Incinerate on hit, Shock on contact")
+        .setAutocomplete(true)
+        .setMaxLength(300)
+    )
+    .addBooleanOption((o) => o.setName("all").setDescription("Rank every champion, not just your roster")),
+
+  new SlashCommandBuilder()
     .setName("warmode")
     .setDescription("Show the war mode, or (officers) switch it")
     .addStringOption((o) =>
