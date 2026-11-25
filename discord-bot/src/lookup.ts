@@ -174,15 +174,20 @@ export function rosterMessages(member: Member, roster: RosterChampion[]): EmbedB
  * The /roster reply: a picture of the whole roster, or the text version if
  * drawing fails. Returns one message's worth per entry.
  */
-/** By default /roster shows rank 4 and up; `all` shows every champion. */
+/** By default /roster shows rank 4 and up; `all` shows every champion, `rank` one rank only. */
 export const ROSTER_MIN_RANK = 4;
+
+export type RosterFilter = { all?: boolean; rank?: number | null };
 
 export async function rosterReplies(
   db: Db,
   member: Member,
-  all = false
+  filter: RosterFilter = {}
 ): Promise<{ embeds: EmbedBuilder[]; files: AttachmentBuilder[] }[]> {
-  const keep = (rank: number | null) => all || (rank ?? 0) >= ROSTER_MIN_RANK;
+  const rank = filter.rank ?? null;
+  const all = !rank && !!filter.all;
+  const keep = (r: number | null) => (rank ? (r ?? 0) === rank : all || (r ?? 0) >= ROSTER_MIN_RANK);
+  const label = rank ? `Rank ${rank}` : all ? null : `Rank ${ROSTER_MIN_RANK}+`;
   try {
     const everything = await loadRosterCards(db, member._id);
     const cards = everything.filter((card) => keep(card.rank));
@@ -190,14 +195,14 @@ export async function rosterReplies(
       displayName: member.displayName,
       battlegroup: member.battlegroup,
       allianceName: member.allianceId ? await allianceName(db, member.allianceId) : "",
-      note: all ? null : `Rank ${ROSTER_MIN_RANK}+ · ${cards.length} of ${everything.length} champions`
+      note: label ? `${label} · ${cards.length} of ${everything.length} champions` : null
     });
     const file = new AttachmentBuilder(image, { name: "roster.jpg" });
     const embed = new EmbedBuilder()
       .setColor(0xe0a93b)
-      .setTitle(`${member.displayName}'s roster${all ? "" : ` · R${ROSTER_MIN_RANK}+`} (${cards.length})`)
+      .setTitle(`${member.displayName}'s roster${rank ? ` · R${rank}` : all ? "" : ` · R${ROSTER_MIN_RANK}+`} (${cards.length})`)
       .setImage("attachment://roster.jpg");
-    if (!all) embed.setFooter({ text: "Add all:True to see every champion" });
+    if (!all && !rank) embed.setFooter({ text: "Add rank to see one rank, or all:True for every champion" });
     return [{ embeds: [embed], files: [file] }];
   } catch (err) {
     console.error("[roster image]", err);

@@ -86,6 +86,12 @@ export const COMMANDS: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [
     .setDescription("Someone's whole roster (leave both options out for your own)")
     .addUserOption((o) => o.setName("user").setDescription("Their Discord account (they need to have linked it)"))
     .addStringOption((o) => o.setName("member").setDescription("Or pick their in-game name").setAutocomplete(true))
+    .addIntegerOption((o) =>
+      o
+        .setName("rank")
+        .setDescription("Only champions at this rank")
+        .addChoices(...[6, 5, 4, 3, 2, 1].map((r) => ({ name: `R${r}`, value: r })))
+    )
     .addBooleanOption((o) => o.setName("all").setDescription("Show every champion, not just rank 4 and up")),
 
   rosterImportCommand,
