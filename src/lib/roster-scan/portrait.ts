@@ -128,30 +128,31 @@ export function similarity(a: Float32Array, b: Float32Array): number {
   return s;
 }
 
-/** A champion's reference features: official portrait windows, or crops users confirmed. */
 export type Reference = { championId: string; source: "portrait" | "confirmed"; features: Float32Array[] };
+export type Candidate = { championId: string; score: number };
 
-/** Best `k` champions for a card feature; each champion scores its best reference feature. */
-export function rankCandidates(f: Float32Array, refs: Reference[], k = 5): { championId: string; score: number }[] {
+/** Ranks champions for one card feature. A champion's score is its best-matching reference. */
+export function rankCandidates(q: Float32Array, refs: Reference[], top = 5): Candidate[] {
   const best = new Map<string, number>();
-  for (const r of refs)
-    for (const rf of r.features) {
-      const s = similarity(f, rf);
-      if (s > (best.get(r.championId) ?? -Infinity)) best.set(r.championId, s);
-    }
-  return [...best].map(([championId, score]) => ({ championId, score })).sort((a, b) => b.score - a.score).slice(0, k);
+  for (const r of refs) {
+    let s = -1;
+    for (const f of r.features) { const v = similarity(q, f); if (v > s) s = v; }
+    if (s > (best.get(r.championId) ?? -2)) best.set(r.championId, s);
+  }
+  return [...best.entries()].map(([championId, score]) => ({ championId, score })).sort((a, b) => b.score - a.score).slice(0, top);
 }
 
 /**
- * 0..1 confidence in the top candidate, from its score and its lead over the
- * runner-up. On the calibration set, correct matches scored 0.35-0.92 with a
- * lead of ~0.25 on average; weak or close calls fall below 0.5.
+ * Confidence of the top match, 0..1: the lower of its absolute similarity and
+ * its lead over the runner-up. Calibrated on 35 labelled cards: right answers
+ * scored 0.35-0.92, the one wrong answer 0.37 with a 0.01 lead.
  */
-export function matchConfidence(cands: { score: number }[]): number {
-  if (!cands.length) return 0;
-  const top = cands[0].score, lead = top - (cands[1]?.score ?? 0);
-  const clamp = (x: number) => Math.max(0, Math.min(1, x));
-  return clamp((top - 0.3) / 0.4) * clamp(lead / 0.2);
+export function matchConfidence(c: Candidate[]): number {
+  if (!c.length) return 0;
+  const top = c[0].score, second = c[1]?.score ?? -1;
+  const abs = Math.max(0, Math.min(1, (top - 0.3) / 0.4));
+  const lead = Math.max(0, Math.min(1, (top - second) / 0.15));
+  return Math.round(Math.min(abs, lead) * 100) / 100;
 }
 
 export function featureToBase64(f: Float32Array): string {
