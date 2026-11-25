@@ -44,6 +44,7 @@ import {
 import { answerRequest, askForNode, bookNode, unbookNode } from "./war";
 import { TAKEOVER_REQUESTS } from "../../src/lib/attack-plans";
 import { nodeSlot } from "../../src/lib/attack-map";
+import { counter, counterAutocomplete } from "./counter";
 
 const EPHEMERAL = MessageFlags.Ephemeral;
 
@@ -93,6 +94,8 @@ async function command(client: Client, i: ChatInputCommandInteraction) {
       return findChamp(i);
     case "roster":
       return roster(i);
+    case "counter":
+      return counter(i);
     case "warmode":
       return warMode(i);
     case "purge":
@@ -123,6 +126,7 @@ function helpEmbed() {
         "`/findchamp Solvarch` every Solvarch on the alliance's rosters (add `bg` for one battlegroup)",
         "Or type `!findchamp solvarch bg1` in any channel",
         "`/roster @someone` their whole roster (or `!roster @someone` in chat)",
+        "`/counter boss:Onslaught nodes:Incinerate on hit, Shock on contact` your best counters for a fight",
         "`/warmode` the current war mode",
         "",
         "**Chat**: say things like *\"I'll take 41 and 44\"* and the bot offers to book them, or *\"anyone have Hercules?\"* and it lists who does.",
@@ -685,6 +689,7 @@ async function smartButton(i: ButtonInteraction, [action, authorId, bg, nodes]: 
 // ---------------------------------------------------------------- autocomplete
 
 async function autocomplete(i: AutocompleteInteraction) {
+  if (i.commandName === "counter") return counterAutocomplete(i);
   const focused = i.options.getFocused(true);
   const db = await getDb();
   if (focused.name === "champion" && i.commandName === "findchamp") {

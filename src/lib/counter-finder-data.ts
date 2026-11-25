@@ -1,10 +1,10 @@
 // Loads the Counter Finder's base JSON (src/data/counters) and merges editor
 // overrides over it. Pure: safe in the browser, on the server and in tests.
 
-import effectsJson from "@/data/counters/effects.json";
-import championsJson from "@/data/counters/champions.json";
-import bossesJson from "@/data/counters/bosses.json";
-import nodesJson from "@/data/counters/nodes.json";
+import effectsJson from "../data/counters/effects.json";
+import championsJson from "../data/counters/champions.json";
+import bossesJson from "../data/counters/bosses.json";
+import nodesJson from "../data/counters/nodes.json";
 import {
   CLASSES,
   CONFIDENCE_LEVELS,

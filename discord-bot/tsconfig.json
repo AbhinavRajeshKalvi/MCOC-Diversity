@@ -16,5 +16,6 @@
       "web-push": ["./node_modules/@types/web-push"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }
