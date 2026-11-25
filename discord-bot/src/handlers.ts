@@ -44,6 +44,7 @@ import {
 import { answerRequest, askForNode, bookNode, unbookNode } from "./war";
 import { TAKEOVER_REQUESTS } from "../../src/lib/attack-plans";
 import { nodeSlot } from "../../src/lib/attack-map";
+import { rosterImport } from "./roster-import";
 
 const EPHEMERAL = MessageFlags.Ephemeral;
 
@@ -93,6 +94,8 @@ async function command(client: Client, i: ChatInputCommandInteraction) {
       return findChamp(i);
     case "roster":
       return roster(i);
+    case "roster-import":
+      return rosterImport(i);
     case "warmode":
       return warMode(i);
     case "purge":

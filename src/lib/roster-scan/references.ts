@@ -1,4 +1,4 @@
-import { getDb, toObjectId } from "@/lib/db";
+import { ObjectId, type Db } from "mongodb";
 import {
   REF_WINDOWS,
   featureFromBase64,
@@ -29,9 +29,12 @@ const PORTRAITS = "rosterScanPortraits";
 export const SAMPLES = "rosterScanSamples";
 const MAX_SAMPLES_PER_CHAMPION = 12;
 
+// Takes the Db instead of importing the app's db helper, so the Discord bot
+// can share this file (and the same cached features) with the web app.
+
 type ChampionDoc = { _id: unknown; name: string; imageUrl?: string | null };
 
-let cache: { at: number; refs: Reference[]; names: Map<string, string> } | null = null;
+let cache: { db: Db; at: number; refs: Reference[]; names: Map<string, string> } | null = null;
 let building: Promise<{ refs: Reference[]; names: Map<string, string> }> | null = null;
 const TTL_MS = 10 * 60 * 1000;
 
@@ -39,12 +42,12 @@ export function invalidateReferences() {
   cache = null;
 }
 
-export async function getReferences(): Promise<{ refs: Reference[]; names: Map<string, string> }> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache;
+export async function getReferences(db: Db): Promise<{ refs: Reference[]; names: Map<string, string> }> {
+  if (cache && cache.db === db && Date.now() - cache.at < TTL_MS) return cache;
   if (!building) {
-    building = build()
+    building = build(db)
       .then((r) => {
-        cache = { at: Date.now(), ...r };
+        cache = { db, at: Date.now(), ...r };
         return r;
       })
       .finally(() => {
@@ -54,8 +57,7 @@ export async function getReferences(): Promise<{ refs: Reference[]; names: Map<s
   return building;
 }
 
-async function build() {
-  const db = await getDb();
+async function build(db: Db) {
   const champions = (await db
     .collection("champions")
     .find({}, { projection: { name: 1, imageUrl: 1 } })
@@ -113,15 +115,15 @@ async function build() {
 
 /** Stores reviewed crops (feature only, no image) as new references. */
 export async function saveSamples(
+  db: Db,
   userId: string,
   samples: { championId: string; feature: string; corrected: boolean }[]
 ) {
   if (!samples.length) return;
-  const db = await getDb();
   const now = new Date();
   await db.collection(SAMPLES).insertMany(
     samples.map((s) => ({
-      championId: toObjectId(s.championId),
+      championId: ObjectId.isValid(s.championId) ? new ObjectId(s.championId) : null,
       feature: s.feature,
       corrected: s.corrected,
       userId,

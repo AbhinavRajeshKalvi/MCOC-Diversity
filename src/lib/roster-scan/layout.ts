@@ -13,6 +13,20 @@ const ROW_PITCH = 1.266; // row spacing / column spacing on every Battle Deck se
 const MIN_SCORE = 0.6;
 
 const T = rankTemplate as { w: number; h: number; x: number; y: number; v: number[] };
+
+// Half-resolution copy of the template, for the coarse whole-image search.
+const HW = T.w >> 1, HH = T.h >> 1;
+const HV = (() => {
+  const v = new Float32Array(HW * HH);
+  for (let j = 0; j < HH; j++)
+    for (let i = 0; i < HW; i++)
+      v[j * HW + i] =
+        (T.v[2 * j * T.w + 2 * i] + T.v[2 * j * T.w + 2 * i + 1] + T.v[(2 * j + 1) * T.w + 2 * i] + T.v[(2 * j + 1) * T.w + 2 * i + 1]) / 4;
+  return v;
+})();
+const HMEAN = HV.reduce((a, b) => a + b, 0) / HV.length;
+const HC = HV.map((v) => v - HMEAN);
+const HNORM = Math.sqrt(HC.reduce((a, b) => a + b * b, 0));
 const TMEAN = T.v.reduce((a, b) => a + b, 0) / T.v.length;
 const TC = T.v.map((v) => v - TMEAN);
 const TNORM = Math.sqrt(TC.reduce((a, b) => a + b * b, 0));
@@ -76,6 +90,45 @@ function median(v: number[]): number {
   return s.length ? s[Math.floor(s.length / 2)] : 0;
 }
 
+/**
+ * Finds the "Rank" word without OCR, by sliding the template over the whole
+ * image at a range of card sizes. Tesseract needs several copies of a word to
+ * read it reliably, so a deck holding one or two champions needs this instead.
+ * Cards are always between about a twentieth and a sixth of the screen wide.
+ */
+async function coarseFind(img: RgbImage): Promise<{ x: number; y: number; unit: number; score: number }[]> {
+  const out: { x: number; y: number; unit: number; score: number }[] = [];
+  const lo = Math.max(40, img.width * 0.045), hi = Math.max(lo + 1, img.width * 0.18);
+  for (let unit = lo; unit <= hi; unit *= 1.1) {
+    const k = 64 / unit; // shrink so one card pitch is 64 px and the half template fits
+    const w = Math.max(HW + 4, Math.round(img.width * k)), h = Math.max(HH + 4, Math.round(img.height * k));
+    const d = await toSharp(img).resize(w, h, { fit: "fill" }).grayscale().raw().toBuffer();
+    let best = { x: 0, y: 0, score: -1 };
+    for (let y = 0; y + HH < h; y += 2)
+      for (let x = 0; x + HW < w; x += 2) {
+        let sum = 0;
+        for (let j = 0; j < HH; j++) {
+          const o = (y + j) * w + x;
+          for (let i = 0; i < HW; i++) sum += d[o + i];
+        }
+        const mean = sum / (HW * HH);
+        let num = 0, den = 0;
+        for (let j = 0; j < HH; j++) {
+          const o = (y + j) * w + x;
+          for (let i = 0; i < HW; i++) {
+            const v = d[o + i] - mean;
+            num += v * HC[j * HW + i];
+            den += v * v;
+          }
+        }
+        const score = den > 0 ? num / (Math.sqrt(den) * HNORM) : -1;
+        if (score > best.score) best = { x, y, score };
+      }
+    out.push({ x: best.x / k, y: best.y / k, unit, score: best.score });
+  }
+  return out.sort((a, b) => b.score - a.score).slice(0, 4);
+}
+
 export async function detectLayout(img: RgbImage): Promise<Layout> {
   const scale = OCR_WIDTH / img.width;
   const png = await toSharp(img).resize({ width: OCR_WIDTH }).grayscale().png().toBuffer();
@@ -84,7 +137,7 @@ export async function detectLayout(img: RgbImage): Promise<Layout> {
   const cands = words
     .filter((w) => /^ra/i.test(w.text) && /^r[a-z]{2}k/i.test(w.text.replace(/[^a-z]/gi, "")))
     .map((w) => ({ x: w.x0 / scale, y: w.y0 / scale, h: (w.y1 - w.y0) / scale }));
-  if (!cands.length) return { kind: "unknown", reason: "No \"Rank N Sig. M\" text found. Is this a Battle Deck screenshot?" };
+  if (!cands.length) return fromCoarse(img, await coarseFind(img));
 
   // Rough unit from the text height (Rank word cap height ≈ 10/128 of the card pitch), refined below.
   // Glued boxes only ever make a box taller, so trust the shorter ones.
@@ -110,7 +163,7 @@ export async function detectLayout(img: RgbImage): Promise<Layout> {
     if (r.a.score > sc.a.score) sc = r;
     if (sc.a.score > 0.8) break;
   }
-  if (sc.a.score < MIN_SCORE) return { kind: "unknown", reason: "Found text that looks like \"Rank\" but no Battle Deck cards." };
+  if (sc.a.score < MIN_SCORE) return fromCoarse(img, await coarseFind(img));
   if (!gaps.length) {
     unit = sc.s * 128;
     // Only one card's text was read: measure the pitch from a neighbouring card instead,
@@ -129,28 +182,51 @@ export async function detectLayout(img: RgbImage): Promise<Layout> {
   }
   const s = unit / 128;
 
-  const anchors: Anchor[] = [];
-  const has = (x: number, y: number) => anchors.some((a) => Math.abs(a.x - x) < unit * 0.3 && Math.abs(a.y - y) < unit * 0.3);
-  const tryAt = async (x: number, y: number) => {
-    if (x < -unit * 0.05 || y < unit * 0.8 || x + unit * 0.85 > img.width || y + unit * 0.3 > img.height || has(x, y)) return false;
-    const a = await matchRank(img, x, y, s, 4);
-    if (a.score < MIN_SCORE || has(a.x, a.y)) return false;
-    anchors.push(a);
-    return true;
-  };
-  anchors.push(sc.a);
-  for (const c of cands) await tryAt(c.x, c.y);
-  if (!anchors.length) return { kind: "unknown", reason: "Couldn't line up the Battle Deck cards." };
+  const anchors = [sc.a];
+  for (const c of cands) await tryAt(img, anchors, unit, s, c.x, c.y);
+  return walkGrid(img, anchors, unit, s);
+}
 
-  // Walk the grid: from every found card, look one pitch left/right/up/down.
+/** Adds the anchor at (x, y) if the template matches there and it's new. */
+async function tryAt(img: RgbImage, anchors: Anchor[], unit: number, s: number, x: number, y: number): Promise<boolean> {
+  const has = (px: number, py: number) => anchors.some((a) => Math.abs(a.x - px) < unit * 0.3 && Math.abs(a.y - py) < unit * 0.3);
+  if (x < -unit * 0.05 || y < unit * 0.8 || x + unit * 0.85 > img.width || y + unit * 0.3 > img.height || has(x, y)) return false;
+  const a = await matchRank(img, x, y, s, 4);
+  if (a.score < MIN_SCORE || has(a.x, a.y)) return false;
+  anchors.push(a);
+  return true;
+}
+
+/** From the cards found so far, looks one card pitch left, right, up and down. */
+async function walkGrid(img: RgbImage, anchors: Anchor[], unit: number, s: number): Promise<Layout> {
+  if (!anchors.length) return { kind: "unknown", reason: "Couldn't line up the Battle Deck cards." };
   const rowStep = unit * ROW_PITCH;
   for (let i = 0; i < anchors.length && anchors.length < 200; i++) {
     const a = anchors[i];
-    await tryAt(a.x + unit, a.y);
-    await tryAt(a.x - unit, a.y);
-    await tryAt(a.x, a.y + rowStep);
-    await tryAt(a.x, a.y - rowStep);
+    await tryAt(img, anchors, unit, s, a.x + unit, a.y);
+    await tryAt(img, anchors, unit, s, a.x - unit, a.y);
+    await tryAt(img, anchors, unit, s, a.x, a.y + rowStep);
+    await tryAt(img, anchors, unit, s, a.x, a.y - rowStep);
   }
   anchors.sort((a, b) => (Math.abs(a.y - b.y) < unit * 0.3 ? a.x - b.x : a.y - b.y));
   return { kind: "battle-deck", unit, anchors };
+}
+
+/**
+ * Turns the coarse search's best guesses into a layout: refine the card size
+ * around each guess, then walk the grid from the best one.
+ */
+async function fromCoarse(img: RgbImage, peaks: { x: number; y: number; unit: number; score: number }[]): Promise<Layout> {
+  let best: { s: number; a: Anchor } | null = null;
+  for (const p of peaks.slice(0, 3)) {
+    if (p.score < MIN_SCORE * 0.8) continue;
+    const r = await bestScale(img, p.x, p.y, p.unit / 128, 0.9, 1.1, 10);
+    if (!best || r.a.score > best.a.score) best = r;
+    if (best.a.score > 0.8) break;
+  }
+  if (!best || best.a.score < MIN_SCORE) {
+    return { kind: "unknown", reason: "No Battle Deck cards found. Use a screenshot of your Battle Deck from the game." };
+  }
+  const unit = best.s * 128;
+  return walkGrid(img, [best.a], unit, best.s);
 }

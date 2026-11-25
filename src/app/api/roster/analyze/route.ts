@@ -3,7 +3,7 @@ import { getSession } from "@/lib/session";
 import { SCREENSHOT_IMPORT_ENABLED } from "@/lib/features";
 import { withErrorHandling } from "@/lib/api-handler";
 import { analyzeScreenshots } from "@/lib/roster-scan/analyze";
-import { getReferences } from "@/lib/roster-scan/references";
+import { getAppReferences } from "@/lib/roster-scan/app-db";
 
 // Free, local screenshot reading: Tesseract (bundled language data, no CDN)
 // finds the cards and plain pixel maths reads the numbers and matches the
@@ -45,7 +45,7 @@ export const POST = withErrorHandling("POST /api/roster/analyze", async (req: Ne
 
   let references;
   try {
-    references = await getReferences();
+    references = await getAppReferences();
   } catch (error) {
     console.error("Roster screenshot analysis could not load champion references:", error);
     return NextResponse.json(
