@@ -142,7 +142,7 @@ function helpEmbed() {
         "`/reset` when nodes 37-50 clear · `/defense` the defender plan",
         "`/findchamp Solvarch` every Solvarch on the alliance's rosters (add `bg` for one battlegroup)",
         "Or type `!findchamp solvarch bg1` in any channel",
-        "`/roster @someone` their whole roster (or `!roster @someone` in chat)",
+        "`/roster @someone` their R5 and R4 champions (add `rank` for one rank, or `!roster name r3` in chat)",
         "`/counter boss:Onslaught nodes:Incinerate on hit, Shock on contact` your best counters for a fight",
         "`/warmode` the current war mode",
         "",
@@ -369,7 +369,10 @@ async function roster(i: ChatInputCommandInteraction) {
     throw new UserError(`${target.displayName} isn't in your alliance.`);
   }
   await i.deferReply();
-  const [first, ...rest] = await rosterReplies(db, target, i.options.getBoolean("all") ?? false);
+  const [first, ...rest] = await rosterReplies(db, target, {
+    all: i.options.getBoolean("all") ?? false,
+    rank: i.options.getInteger("rank")
+  });
   await i.editReply(first);
   for (const message of rest) await i.followUp(message);
 }
