@@ -1,3 +1,4 @@
-// Screenshot roster import is still under development. While this is false the
-// section is shown locked on the profile page and its API routes refuse requests.
-export const SCREENSHOT_IMPORT_ENABLED = false;
+// Screenshot roster import reads Battle Deck screenshots locally and for free
+// (Tesseract finds the cards, pixel matching reads the numbers and the
+// champion). Every import goes through a review step before anything is saved.
+export const SCREENSHOT_IMPORT_ENABLED = true;
